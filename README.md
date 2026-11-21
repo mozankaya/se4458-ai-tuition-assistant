@@ -48,7 +48,23 @@ Non-student users: `bank1` (role `bank`), `admin1` (role `admin`).
 
 ## REST API
 
-_TBD_ — endpoints, Swagger UI, OpenAPI spec.
+- Swagger UI: `http://localhost:8000/docs` (local) — gateway URL _TBD_
+- OpenAPI specification: [docs/openapi.json](docs/openapi.json) (regenerate with
+  `cd api && ../.venv/Scripts/python -m app.export_openapi`; a test fails if it is out of date)
+
+| Operation | Method & route | Auth | Paging |
+|---|---|---|---|
+| Login | `POST /api/v1/auth/login` | — | — |
+| Current identity | `GET /api/v1/auth/me` | Any role | — |
+| Query Tuition (Mobile) | `GET /api/v1/mobile/tuition/{studentNo}` | No (3 calls / student / day) | No |
+| Query Tuition (Banking) | `GET /api/v1/banking/tuition/{studentNo}` | `bank`, `student` (own) | No |
+| Pay Tuition (Banking) | `POST /api/v1/banking/payments` | `bank`, `student` (own) | No |
+| Add Tuition (Admin) | `POST /api/v1/admin/tuitions` | `admin` | No |
+| Add Tuition Batch (Admin) | `POST /api/v1/admin/tuitions/batch` (CSV upload) | `admin` | No |
+| Unpaid Tuition Status (Admin) | `GET /api/v1/admin/tuitions/unpaid?term=&page=&pageSize=` | `admin` | Yes |
+
+Errors always use `{"error": {"code": "...", "message": "...", "details": ...}}`. The error code
+catalog is in the Swagger UI description.
 
 ## API Gateway
 

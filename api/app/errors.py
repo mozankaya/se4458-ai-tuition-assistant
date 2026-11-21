@@ -1,5 +1,6 @@
 """Consistent error responses: {"error": {"code": "...", "message": "...", "details": ...}}."""
 
+import logging
 from http import HTTPStatus
 from typing import Any
 
@@ -9,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger("tuition_api")
 
 
 class ErrorBody(BaseModel):
@@ -78,7 +81,13 @@ async def _validation_error_handler(_: Request, exc: RequestValidationError) -> 
     return error_response(422, "VALIDATION_ERROR", "Request validation failed", details)
 
 
+async def _unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error", exc_info=exc)
+    return error_response(500, "INTERNAL_ERROR", "An unexpected error occurred")
+
+
 def register_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(Exception, _unhandled_error_handler)
     app.add_exception_handler(ApiError, _api_error_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
     app.add_exception_handler(RequestValidationError, _validation_error_handler)
