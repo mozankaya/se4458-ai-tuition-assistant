@@ -27,7 +27,24 @@ _TBD_
 
 ## Data model (ER diagram)
 
-_TBD_
+See [docs/er-diagram.md](docs/er-diagram.md).
+
+### Seed test data
+
+`python -m app.seed` loads the following demo data. All demo users share the password from
+`SEED_DEMO_PASSWORD` in `.env`.
+
+| Student No | User | Term | Amount | Paid | Balance | Scenario |
+|---|---|---|---|---|---|---|
+| 20230001 | `student1` | 2026-FALL | 3000.00 | 0.00 | 3000.00 | Installment eligible |
+| 20230001 | `student1` | 2027-SPRING | 3000.00 | 0.00 | 3000.00 | |
+| 20230002 | `student2` | 2026-FALL | 2250.00 | 2250.00 | 0.00 | Scholarship, fully paid |
+| 20230002 | `student2` | 2027-SPRING | 2250.00 | 1000.00 | 1250.00 | Partially paid |
+| 20230003 | `student3` | 2026-FALL | 250.00 | 0.00 | 250.00 | Below $300 installment threshold |
+| 20230004 | `student4` | 2026-FALL | 3000.00 | 1500.00 | 1500.00 | Half paid |
+| 20230005 | — | — | — | — | — | No tuition record |
+
+Non-student users: `bank1` (role `bank`), `admin1` (role `admin`).
 
 ## REST API
 
@@ -60,6 +77,7 @@ Run the Tuition API locally:
 py -3.12 -m venv .venv
 .venv/Scripts/python -m pip install -r api/requirements-dev.txt
 cd api
+../.venv/Scripts/python -m app.seed --reset   # create schema and load demo data
 ../.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 # Health check: http://localhost:8000/api/v1/health  |  Swagger UI: http://localhost:8000/docs
 ```

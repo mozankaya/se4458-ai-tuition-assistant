@@ -22,6 +22,10 @@ project progresses and summarized in the README.
 - `tuitions.paid_amount` is a running total updated in the same transaction as each payment insert;
   `payments` is the immutable audit trail. See [er-diagram.md](er-diagram.md).
 
+- The schema is created with SQLAlchemy `create_all` (`python -m app.seed`) instead of Alembic
+  migrations, to keep the project simple. Integrity rules are enforced as database constraints.
+- Passwords are hashed with PBKDF2-HMAC-SHA256 (600,000 iterations, random salt).
+
 ## Add Tuition duplicate handling
 
 - Add Tuition is create-or-update keyed by `(studentNo, term)`: an existing record's amount and currency
