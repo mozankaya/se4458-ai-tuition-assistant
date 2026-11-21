@@ -24,6 +24,29 @@ class TermBalance(CamelModel):
     balance: Money
 
 
+class PaymentRequest(CamelModel):
+    student_no: str = Field(pattern=STUDENT_NO_PATTERN, examples=["20230001"])
+    term: str = Field(pattern=TERM_PATTERN, examples=["2026-FALL"])
+    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2, examples=[500.00])
+    transaction_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Client-generated unique ID (e.g. UUID). Reused IDs are rejected.",
+        examples=["3f1c2a9e-8d7b-4c1e-9a55-0b6f1e2d4c3a"],
+    )
+
+
+class PaymentResponse(CamelModel):
+    status: str = Field(examples=["SUCCESS"])
+    transaction_id: str
+    student_no: str
+    term: str
+    paid_amount: Money = Field(description="Amount recorded by this payment")
+    remaining_balance: Money = Field(description="Outstanding balance for the term after this payment")
+    currency: str
+
+
 class TuitionSummary(CamelModel):
     """Overall totals for a student plus a per-term breakdown."""
 
