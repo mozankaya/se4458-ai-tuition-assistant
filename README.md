@@ -54,7 +54,17 @@ cp .env.example .env          # then edit secrets
 docker compose up -d db db-test
 ```
 
-_TBD_ — run API, MCP server and agent.
+Run the Tuition API locally:
+
+```bash
+py -3.12 -m venv .venv
+.venv/Scripts/python -m pip install -r api/requirements-dev.txt
+cd api
+../.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+# Health check: http://localhost:8000/api/v1/health  |  Swagger UI: http://localhost:8000/docs
+```
+
+_TBD_ — run MCP server and agent.
 
 ## Testing
 
