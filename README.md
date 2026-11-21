@@ -72,7 +72,19 @@ _TBD_ — gateway URL, route mapping, protected route, sample error response.
 
 ## MCP Server
 
-_TBD_ — tool schema and indexing approach.
+### Indexing approach
+
+- The policy document is split by Markdown headings: one chunk per `##`/`###` section that has body
+  text (26 chunks). Text before the first `##` becomes section `intro`; headings inside code blocks
+  are ignored. Each chunk keeps its section ID (e.g. `3.2`), heading and parent heading.
+- Chunks are indexed with BM25 (`rank-bm25`, full-text). Tokens are lowercased, stopwords are removed
+  and a trailing plural `s` is stripped (`installments` → `installment`). Headings are indexed together
+  with the body so section titles also match.
+- The index is built **once at server startup** and kept in memory; queries never re-read the file.
+- Embeddings were not used: the document is small and BM25 ranks the expected sections first for the
+  demo queries (see `mcp_server/tests/test_index.py`).
+
+_TBD_ — tool schema and server.
 
 ## AI Agent
 
