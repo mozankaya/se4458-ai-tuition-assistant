@@ -1,0 +1,93 @@
+# Kong declarative configuration (DB-less) for the Tuition API gateway.
+#
+# __JWT_SECRET__ is replaced with JWT_SECRET from the environment when the container starts
+# (see gateway/start-kong.sh); the secret is never stored in this file.
+#
+# __API_UPSTREAM__ is the Tuition API base URL (e.g. http://api:8080), also set at start-up.
+
+_format_version: "3.0"
+
+services:
+  - name: tuition-api
+    url: __API_UPSTREAM__
+    connect_timeout: 5000
+    read_timeout: 30000
+    routes:
+      # --- Public routes --------------------------------------------------------------------
+      - name: health
+        paths: ["/api/v1/health"]
+        methods: [GET]
+        strip_path: false
+
+      - name: auth-login
+        paths: ["/api/v1/auth/login"]
+        methods: [POST]
+        strip_path: false
+
+      - name: api-docs
+        paths: ["/docs", "/openapi.json"]
+        methods: [GET]
+        strip_path: false
+
+      # Mobile query: no authentication, 3 calls per student number per day.
+      - name: mobile-tuition-query
+        paths: ["~/api/v1/mobile/tuition/[^/]+$"]
+        methods: [GET]
+        strip_path: false
+        plugins:
+          # Runs first: copies the student number from the path into X-Student-No.
+          # Any client-supplied X-Student-No is overwritten, so the key cannot be spoofed.
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local student_no = kong.request.get_path():match("^/api/v1/mobile/tuition/([^/]+)$")
+                  kong.service.request.set_header("X-Student-No", student_no or "invalid")
+          - name: rate-limiting
+            config:
+              day: 3
+              limit_by: header
+              header_name: X-Student-No
+              policy: local
+              fault_tolerant: true
+              error_code: 429
+              error_message: "Daily query limit of 3 reached for this student number"
+
+      # --- Protected routes (JWT required at the gateway) -------------------------------------
+      - name: auth-me
+        paths: ["/api/v1/auth/me"]
+        methods: [GET]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config: &jwt_config
+              key_claim_name: iss
+              claims_to_verify: [exp]
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+
+      - name: banking
+        paths: ["/api/v1/banking"]
+        methods: [GET, POST]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config: *jwt_config
+
+      - name: admin
+        paths: ["/api/v1/admin"]
+        methods: [GET, POST]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config: *jwt_config
+
+# Tokens are issued by the Tuition API (iss = "tuition-api", HS256). The gateway verifies the
+# signature and expiry; role and ownership checks stay in the API.
+consumers:
+  - username: tuition-api-token-issuer
+    jwt_secrets:
+      - key: tuition-api
+        algorithm: HS256
+        secret: "__JWT_SECRET__"

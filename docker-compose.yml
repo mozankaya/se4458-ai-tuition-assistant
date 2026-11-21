@@ -34,5 +34,33 @@ services:
       timeout: 3s
       retries: 10
 
+  # API Gateway (Kong, DB-less). All REST traffic, including the AI agent, goes through port 8000.
+  gateway:
+    image: kong:3.9
+    container_name: tuition-gateway
+    entrypoint: ["/bin/sh", "/kong/start-kong.sh"]
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      # Until the API runs in compose, "api" resolves to the host machine (API on port 8080).
+      API_UPSTREAM: ${API_UPSTREAM:-http://api:8080}
+      KONG_DATABASE: "off"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      KONG_ADMIN_LISTEN: "off"
+      KONG_STATUS_LISTEN: "0.0.0.0:8100"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+    volumes:
+      - ./gateway/kong.yml:/kong/kong.yml:ro
+      - ./gateway/start-kong.sh:/kong/start-kong.sh:ro
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    extra_hosts:
+      - "api:host-gateway"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   db-data:
