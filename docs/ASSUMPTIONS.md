@@ -58,6 +58,19 @@ project progresses and summarized in the README.
 - The day boundary is computed in the `Europe/Istanbul` time zone.
 - Calls for unknown student numbers also count toward the limit (reduces enumeration).
 - The limit is enforced both at the gateway and inside the API (database counter, for testability).
+- Every call is counted, including rejected ones; the counter is committed before the lookup runs.
+- Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`; a `429` also carries `Retry-After`
+  (seconds until the next Istanbul midnight).
+- Malformed student numbers (`422`) are rejected before counting.
+
+## Query responses
+
+- JSON field names are camelCase (`studentNo`, `tuitionTotal`, `paidAmount`).
+- Money values are JSON numbers rounded to 2 decimals.
+- A known student with no tuition records returns `200` with zero totals and an empty `terms` list;
+  an unknown student returns `404 STUDENT_NOT_FOUND`.
+- A student's tuition records are assumed to share one currency; the response reports that currency
+  (`USD` when there are no records).
 
 ## API Gateway
 
