@@ -34,14 +34,44 @@ services:
       timeout: 3s
       retries: 10
 
+  # Tuition REST API. Not published on the host: clients reach it only through the gateway.
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: tuition-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Istanbul}
+      MOBILE_DAILY_QUERY_LIMIT: ${MOBILE_DAILY_QUERY_LIMIT:-3}
+      SEED_ON_START: "true"
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:?set in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # MCP server: policy search over streamable HTTP. Separate from the gateway path.
+  mcp:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    container_name: tuition-mcp
+    ports:
+      - "${MCP_PORT:-8001}:8001"
+
   # API Gateway (Kong, DB-less). All REST traffic, including the AI agent, goes through port 8000.
   gateway:
     image: kong:3.9
     container_name: tuition-gateway
     entrypoint: ["/bin/sh", "/kong/start-kong.sh"]
+    depends_on:
+      api:
+        condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET:?set in .env}
-      # Until the API runs in compose, "api" resolves to the host machine (API on port 8080).
       API_UPSTREAM: ${API_UPSTREAM:-http://api:8080}
       KONG_DATABASE: "off"
       KONG_PROXY_LISTEN: "0.0.0.0:8000"
@@ -54,8 +84,6 @@ services:
       - ./gateway/start-kong.sh:/kong/start-kong.sh:ro
     ports:
       - "${GATEWAY_PORT:-8000}:8000"
-    extra_hosts:
-      - "api:host-gateway"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s

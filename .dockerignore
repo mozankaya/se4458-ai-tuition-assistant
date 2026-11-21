@@ -1,0 +1,10 @@
+.git
+.venv
+.env
+CLAUDE.md
+.claude
+docs/assignment
+**/__pycache__
+**/.pytest_cache
+**/tests
+agent
