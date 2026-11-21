@@ -98,6 +98,16 @@ project progresses and summarized in the README.
 - A student's tuition records are assumed to share one currency; the response reports that currency
   (`USD` when there are no records).
 
+## AI Agent
+
+- The LLM is called through the OpenAI-compatible Chat Completions API with `tool_choice=auto`, so the
+  model itself selects tools (no keyword routing). `LLM_PROVIDER=gemini` uses Google's OpenAI-compatible
+  endpoint; `LLM_PROVIDER=openai` uses OpenAI. Only `.env` changes between providers.
+- Tools: `search_tuition_policies` (MCP), `get_my_tuition` and `pay_tuition` (REST via the gateway).
+- No tool takes a student number. The agent always uses the student number of the logged-in user
+  (JWT), so a number typed in a prompt cannot be used to read or pay for another student.
+- The agent, not the LLM, generates the payment `transactionId` (UUID).
+
 ## API Gateway
 
 - Kong (DB-less, declarative config) is used as the gateway, locally and in the cloud, so the same
