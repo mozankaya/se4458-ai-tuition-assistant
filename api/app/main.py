@@ -3,7 +3,8 @@
 from fastapi import FastAPI
 
 from app.config import get_settings
-from app.routers import health
+from app.errors import register_error_handlers
+from app.routers import auth, health
 
 
 def create_app() -> FastAPI:
@@ -13,7 +14,9 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description="Tuition query, payment and administration API for the AI Tuition Assistant.",
     )
+    register_error_handlers(app)
     app.include_router(health.router, prefix=settings.api_v1_prefix)
+    app.include_router(auth.router, prefix=settings.api_v1_prefix)
     return app
 
 
