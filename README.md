@@ -205,32 +205,50 @@ cd agent
 
 ## Local setup
 
-Prerequisites: Python 3.12, Docker Desktop.
+Prerequisites: Docker Desktop (full stack) and Python 3.12 (tests and the agent CLI).
+
+### Full stack with one command
 
 ```bash
-cp .env.example .env          # then edit secrets
-docker compose up -d db db-test
+cp .env.example .env          # then set POSTGRES_PASSWORD, JWT_SECRET, SEED_DEMO_PASSWORD, GEMINI_API_KEY
+docker compose up -d --build
 ```
 
-Run the Tuition API locally:
+| Service | Container | Host port | Notes |
+|---|---|---|---|
+| PostgreSQL | `tuition-db` | 5432 | Demo data is seeded automatically when the API starts (idempotent) |
+| PostgreSQL (tests) | `tuition-db-test` | 5433 | Disposable database for `pytest` |
+| Tuition API | `tuition-api` | — | Not published; reachable only through the gateway |
+| MCP server | `tuition-mcp` | 8001 | `http://localhost:8001/mcp`, health: `/health` |
+| API Gateway (Kong) | `tuition-gateway` | 8000 | `http://localhost:8000` — Swagger UI at `/docs` |
+
+Check: `http://localhost:8000/api/v1/health` and `http://localhost:8001/health`.
+Reset the demo data (also restart the gateway to clear its rate-limit counters):
+
+```bash
+docker compose exec api python -m app.seed --reset
+docker compose restart gateway
+```
+
+### Agent CLI and tests (run on the host)
 
 ```bash
 py -3.12 -m venv .venv
-.venv/Scripts/python -m pip install -r api/requirements-dev.txt
+.venv/Scripts/python -m pip install -r api/requirements-dev.txt -r mcp_server/requirements-dev.txt -r agent/requirements-dev.txt
+cd agent && ../.venv/Scripts/python -m tuition_agent -u student1
+```
+
+### Running the API without Docker (development)
+
+```bash
+docker compose up -d db db-test mcp
 cd api
-../.venv/Scripts/python -m app.seed --reset   # create schema and load demo data
+../.venv/Scripts/python -m app.seed --reset
 ../.venv/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-Start the gateway (all clients, including the agent, use `http://localhost:8000`):
-
-```bash
-docker compose up -d gateway
-# Health check through the gateway: http://localhost:8000/api/v1/health
-# Swagger UI through the gateway:   http://localhost:8000/docs
-```
-
-_TBD_ — run MCP server and agent.
+If the API runs on the host, the gateway must reach it at `host.docker.internal`:
+set `API_UPSTREAM=http://host.docker.internal:8080` in `.env` and run `docker compose up -d --no-deps gateway`.
 
 ## Testing
 

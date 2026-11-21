@@ -114,6 +114,14 @@ project progresses and summarized in the README.
 - If the LLM provider fails in the middle of a question, the question is removed from the chat
   history, and any payment that already succeeded is still reported to the user so it is not repeated.
 
+## Containers
+
+- The API and MCP server run as `python:3.12-slim` images under a non-root user, with health checks.
+- The API container is not published on the host; in compose it is reachable only through the gateway.
+- With `SEED_ON_START=true` the API creates missing tables and demo rows at start-up (idempotent;
+  existing data is kept). `python -m app.seed --reset` is the explicit way to restore the demo data.
+- The MCP image contains a copy of the policy document and indexes it once at start-up.
+
 ## API Gateway
 
 - Kong (DB-less, declarative config) is used as the gateway, locally and in the cloud, so the same
