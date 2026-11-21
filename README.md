@@ -48,7 +48,7 @@ Non-student users: `bank1` (role `bank`), `admin1` (role `admin`).
 
 ## REST API
 
-- Swagger UI: `http://localhost:8000/docs` (local) — gateway URL _TBD_
+- Swagger UI: `http://localhost:8000/docs` (through the local gateway) — cloud URL _TBD_
 - OpenAPI specification: [docs/openapi.json](docs/openapi.json) (regenerate with
   `cd api && ../.venv/Scripts/python -m app.export_openapi`; a test fails if it is out of date)
 
@@ -68,7 +68,46 @@ catalog is in the Swagger UI description.
 
 ## API Gateway
 
-_TBD_ — gateway URL, route mapping, protected route, sample error response.
+**Kong 3.9 (open source, DB-less)**, configured declaratively in [gateway/kong.yml](gateway/kong.yml).
+All REST traffic goes through it, including the AI agent (`GATEWAY_BASE_URL`). The MCP server is a
+separate path and does not go through the gateway, as the assignment's architecture requires.
+
+- Local gateway URL: `http://localhost:8000` → upstream Tuition API on port `8080`
+- Cloud gateway URL: _TBD_
+
+| Public route (gateway) | Methods | Upstream | Gateway policy |
+|---|---|---|---|
+| `/api/v1/health` | GET | Tuition API | — |
+| `/api/v1/auth/login` | POST | Tuition API | — |
+| `/api/v1/mobile/tuition/{studentNo}` | GET | Tuition API | **Rate limit: 3 / day per student number** |
+| `/api/v1/auth/me` | GET | Tuition API | **JWT required** |
+| `/api/v1/banking/...` | GET, POST | Tuition API | **JWT required** |
+| `/api/v1/admin/...` | GET, POST | Tuition API | **JWT required** |
+| `/docs`, `/openapi.json` | GET | Tuition API | — |
+
+How it works:
+
+- **JWT:** the gateway verifies the token signature (HS256, shared `JWT_SECRET`), issuer and expiry
+  before forwarding. Roles and student ownership are then checked by the API.
+- **Rate limit keyed by student number, not IP:** a `pre-function` copies the student number from the
+  path into the `X-Student-No` header (overwriting any client value), and the `rate-limiting` plugin
+  limits by that header. The API keeps its own database counter as well.
+- **Secrets:** `kong.yml` contains placeholders only; [gateway/start-kong.sh](gateway/start-kong.sh)
+  fills in `JWT_SECRET` and the upstream URL when the container starts.
+
+Sample error responses from the gateway:
+
+```text
+GET /api/v1/banking/tuition/20230001        (no token)
+401 {"message":"Unauthorized"}
+
+GET /api/v1/mobile/tuition/20230003         (4th call of the day)
+429 {"message":"Daily query limit of 3 reached for this student number", "request_id":"..."}
+```
+
+Verify with `python gateway/smoke_test.py` (12 checks: public route, protected route with/without a
+valid token, other student's data, rate limit, unknown route). Latest result:
+[docs/traces/gateway_smoke_test.txt](docs/traces/gateway_smoke_test.txt).
 
 ## MCP Server
 
@@ -180,8 +219,15 @@ py -3.12 -m venv .venv
 .venv/Scripts/python -m pip install -r api/requirements-dev.txt
 cd api
 ../.venv/Scripts/python -m app.seed --reset   # create schema and load demo data
-../.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
-# Health check: http://localhost:8000/api/v1/health  |  Swagger UI: http://localhost:8000/docs
+../.venv/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+Start the gateway (all clients, including the agent, use `http://localhost:8000`):
+
+```bash
+docker compose up -d gateway
+# Health check through the gateway: http://localhost:8000/api/v1/health
+# Swagger UI through the gateway:   http://localhost:8000/docs
 ```
 
 _TBD_ — run MCP server and agent.

@@ -118,4 +118,13 @@ project progresses and summarized in the README.
 
 - Kong (DB-less, declarative config) is used as the gateway, locally and in the cloud, so the same
   configuration is used everywhere. Azure API Management Consumption tier was not chosen because it does
-  not support `rate-limit-by-key`, which is needed for the per-student limit.
+  not support `rate-limit-by-key`, which is needed for the per-student limit; paid APIM tiers were
+  avoided for cost.
+- The gateway verifies JWT signature, issuer (`iss` = `tuition-api`) and expiry. Authorization (roles,
+  own student number) is enforced by the API, so a valid token alone is not enough.
+- Gateway rate limiting uses Kong's `local` policy: counters are kept in memory per gateway instance and
+  reset when the gateway restarts. With a single gateway instance this is exact. Kong counts calendar
+  days in UTC while the API counts Istanbul days; both limits apply, so a student never gets more than
+  3 calls in either window.
+- Gateway errors (401, 404, 429) use Kong's `{"message": ...}` format; errors produced by the API keep
+  the API's `{"error": {...}}` format. The agent's REST client understands both.

@@ -1,0 +1,35 @@
+Gateway: http://localhost:8000
+
+[PASS] public route: GET /api/v1/health -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"status":"ok","service":"Tuition API","version":"1.0.0"}
+[PASS] protected route without token (gateway rejects): GET /api/v1/banking/tuition/20230001 -> 401 (expected 401, answered by: gateway itself)
+       body: {"message":"Unauthorized"}
+[PASS] protected route with forged token (gateway rejects): GET /api/v1/banking/tuition/20230001 -> 401 (expected 401, answered by: gateway itself)
+       body: {"message":"Bad token; invalid JSON"}
+[PASS] login: POST /api/v1/auth/login -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: (hidden: contains a token)
+[PASS] protected route with valid token: GET /api/v1/banking/tuition/20230001 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"studentNo":"20230001","currency":"USD","tuitionTotal":6000.0,"balance":6000.0,"terms":[{"term":"2026-FALL","tuitionTotal":3000.0,"paidAmount":0.0,"balance":3000.0},{"term":"2027-SPRING","tuitionTota
+[PASS] other student's data with valid token (API rejects): GET /api/v1/banking/tuition/20230002 -> 403 (expected 403, answered by: 1.1 kong/3.9.5)
+       body: {"error":{"code":"FORBIDDEN","message":"Students can only access their own tuition records"}}
+[PASS] mobile query #1: GET /api/v1/mobile/tuition/20230003 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"studentNo":"20230003","currency":"USD","tuitionTotal":250.0,"balance":250.0,"terms":[{"term":"2026-FALL","tuitionTotal":250.0,"paidAmount":0.0,"balance":250.0}]}
+[PASS] mobile query #2: GET /api/v1/mobile/tuition/20230003 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"studentNo":"20230003","currency":"USD","tuitionTotal":250.0,"balance":250.0,"terms":[{"term":"2026-FALL","tuitionTotal":250.0,"paidAmount":0.0,"balance":250.0}]}
+[PASS] mobile query #3: GET /api/v1/mobile/tuition/20230003 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"studentNo":"20230003","currency":"USD","tuitionTotal":250.0,"balance":250.0,"terms":[{"term":"2026-FALL","tuitionTotal":250.0,"paidAmount":0.0,"balance":250.0}]}
+[PASS] mobile query #4 (rate limited, keyed by student number): GET /api/v1/mobile/tuition/20230003 -> 429 (expected 429, answered by: gateway itself)
+       body: {
+  "message":"Daily query limit of 3 reached for this student number",
+  "request_id":"dbb17c57c08c8f071b00ea3286f2671b"
+}
+       rate-limit headers: limit=3 remaining=0
+[PASS] mobile query for a different student is not affected: GET /api/v1/mobile/tuition/20230004 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
+       body: {"studentNo":"20230004","currency":"USD","tuitionTotal":3000.0,"balance":1500.0,"terms":[{"term":"2026-FALL","tuitionTotal":3000.0,"paidAmount":1500.0,"balance":1500.0}]}
+[PASS] unknown route: GET /api/v2/tuition/20230001 -> 404 (expected 404, answered by: gateway itself)
+       body: {
+  "message":"no Route matched with those values",
+  "request_id":"8883bc589136b350135e1227befe0735"
+}
+
+ALL CHECKS PASSED
