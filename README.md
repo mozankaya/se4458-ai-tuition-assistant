@@ -125,7 +125,32 @@ cd mcp_server
 
 ## AI Agent
 
-_TBD_ — tool calling flow, payment confirmation, tool traces.
+Flow per question: user question → LLM (function calling, `tool_choice=auto`) selects tools → the
+agent executes them (MCP for policy, REST via the gateway for live data) → results go back to the LLM
+→ grounded answer with policy section references. The LLM never calls a backend directly.
+
+| Tool | Backend | Notes |
+|---|---|---|
+| `search_tuition_policies(query, top_k)` | MCP server | Policy passages with section IDs |
+| `get_my_tuition()` | `GET /api/v1/banking/tuition/{studentNo}` via gateway | Student number comes from the JWT |
+| `pay_tuition(term, amount)` | `POST /api/v1/banking/payments` via gateway | Requires typing `yes`; agent generates the `transactionId` |
+
+- **Login:** the CLI logs in as a student at start-up; non-student accounts are rejected.
+- **Payment confirmation (enforced in code):** before calling the payment API the agent fetches the
+  live balance and shows student, term, amount, current balance and balance after. Only the exact
+  answer `yes` submits the payment. Invalid amounts or amounts above the term balance are rejected
+  before the user is asked.
+- **Tool trace:** every question prints the tool names, inputs and results, and saves a JSON file
+  (`docs/traces/agent_<timestamp>_<question>.json`) with the final answer and LLM token usage.
+
+Run the CLI (requires the API, MCP server and an LLM key in `.env`):
+
+```bash
+cd agent
+../.venv/Scripts/python -m pip install -r requirements-dev.txt
+../.venv/Scripts/python -m tuition_agent                 # interactive
+../.venv/Scripts/python -m tuition_agent -u student1 -q "What is my balance?"
+```
 
 ## Local setup
 
