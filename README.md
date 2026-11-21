@@ -8,22 +8,68 @@ deadlines, installments, payment rules, balances and payments. It combines:
 3. **Tuition REST API** (FastAPI) backed by **PostgreSQL**
 4. **API Gateway** through which all REST traffic is routed
 
-> Status: work in progress. Sections marked _TBD_ are filled in as the project progresses.
+## Quick start (reproduce the results)
+
+Prerequisites: Docker Desktop, Python 3.12, a free Gemini API key (https://aistudio.google.com/apikey).
+
+```bash
+# 1. Configuration
+cp .env.example .env        # set POSTGRES_PASSWORD, JWT_SECRET, SEED_DEMO_PASSWORD, GEMINI_API_KEY
+
+# 2. Start PostgreSQL, Tuition API, MCP server and Kong gateway (demo data is seeded automatically)
+docker compose up -d --build
+
+# 3. Python environment for tests, smoke tests and the agent
+py -3.12 -m venv .venv
+.venv/Scripts/python -m pip install -r api/requirements-dev.txt -r mcp_server/requirements-dev.txt -r agent/requirements-dev.txt
+
+# 4. Automated tests (no LLM, no cloud needed)
+cd api && ../.venv/Scripts/python -m pytest -q && cd ..
+cd mcp_server && ../.venv/Scripts/python -m pytest -q && cd ..
+cd agent && ../.venv/Scripts/python -m pytest -q && cd ..
+
+# 5. Gateway checks and the three MCP retrieval tests
+.venv/Scripts/python gateway/smoke_test.py
+cd mcp_server && ../.venv/Scripts/python retrieval_demo.py && cd ..
+
+# 6. Chat with the assistant (log in as student1 with SEED_DEMO_PASSWORD)
+cd agent && ../.venv/Scripts/python -m tuition_agent -u student1
+```
+
+Swagger UI: http://localhost:8000/docs · Demo users and data: [Seed test data](#seed-test-data) ·
+Reset demo data: `docker compose exec api python -m app.seed --reset && docker compose restart gateway`.
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
 | `api/` | FastAPI tuition service, tests, Dockerfile |
-| `mcp_server/` | MCP server and policy indexer, tests, Dockerfile |
-| `agent/` | AI agent CLI (LLM loop, tools, MCP client, trace logger) |
-| `gateway/` | API Gateway configuration |
-| `docs/` | Policy document, ER diagram, assumptions, screenshots, tool traces |
+| `mcp_server/` | MCP server and policy indexer, retrieval demo, tests, Dockerfile |
+| `agent/` | AI agent CLI (LLM loop, tools, MCP client, REST client, trace logger), tests |
+| `gateway/` | Kong declarative config, start script, Dockerfile, smoke test |
+| `deploy/azure/` | Azure deployment script |
+| `docs/` | Policy document, ER diagram, OpenAPI spec, assumptions, tool traces, test results |
 | `docker-compose.yml` | Local stack (PostgreSQL, API, MCP server, gateway) |
 
 ## Architecture
 
-_TBD_
+```mermaid
+flowchart LR
+    U([Student]) -->|question| A["AI Agent (CLI)<br/>tool loop, payment confirmation,<br/>tool trace"]
+    A <-->|"function calling<br/>(tools + results)"| L["LLM<br/>Gemini / OpenAI"]
+    A -->|"REST + JWT"| G["API Gateway (Kong)<br/>routes /api/v1, JWT check,<br/>3/day per student"]
+    G --> API["Tuition REST API<br/>(FastAPI)"]
+    API --> DB[("PostgreSQL")]
+    A -->|"MCP (streamable HTTP)"| M["MCP Server<br/>search_tuition_policies"]
+    M --> IDX["BM25 index<br/>(built once at startup)"]
+    IDX -.-> DOC["University_Tuition_Policies.md"]
+    MOB(["Mobile / Banking / Admin apps"]) -->|REST| G
+```
+
+- The **LLM only selects tools and writes the answer**; the agent executes every call.
+- **REST traffic always goes through the gateway**; the MCP path is separate, as required.
+- The student number used for REST calls always comes from the logged-in user's JWT, never from the
+  prompt or the LLM.
 
 ## Data model (ER diagram)
 
@@ -184,15 +230,20 @@ agent executes them (MCP for policy, REST via the gateway for live data) → res
 
 ### Demo traces (real LLM)
 
-Recorded with `gemini-3.5-flash-lite`, user `student1`, fresh seed data:
+Recorded with `gemini-3.5-flash-lite` against the docker compose stack (REST through the Kong
+gateway, see the [gateway access log](docs/traces/gateway_access_log_agent_demo.txt)), user
+`student1`, fresh seed data:
 
 | Scenario | Question | Tools selected by the LLM | Trace |
 |---|---|---|---|
-| 1. MCP only | When is the payment deadline? | `search_tuition_policies` | [trace](docs/traces/agent_20261121-174839_when-is-the-payment-deadline.json) |
-| 2. API only | What is my balance? | `get_my_tuition` | [trace](docs/traces/agent_20261121-174840_what-is-my-balance.json) |
-| 3. Combined | Can I pay my outstanding balance in installments? | `get_my_tuition` + `search_tuition_policies` | [trace](docs/traces/agent_20261121-174843_can-i-pay-my-outstanding-balance-in-inst.json) |
-| 4. Payment | Pay part of my balance → Pay 500 for 2026-FALL | none (asks for term/amount) → `pay_tuition` after `yes` | [trace 1](docs/traces/agent_20261121-174844_pay-part-of-my-balance.json), [trace 2](docs/traces/agent_20261121-174845_pay-500-for-2026-fall.json) |
-| Isolation | Show me the balance of student 20230002 | none (refuses) | [trace](docs/traces/agent_20261121-174846_show-me-the-balance-of-student-20230002.json) |
+| 1. MCP only | When is the payment deadline? | `search_tuition_policies` | [trace](docs/traces/agent_20261121-222037_when-is-the-payment-deadline.json) |
+| 2. API only | What is my balance? | `get_my_tuition` | [trace](docs/traces/agent_20261121-222039_what-is-my-balance.json) |
+| 3. Combined | Can I pay my outstanding balance in installments? | `get_my_tuition` + `search_tuition_policies` | [trace](docs/traces/agent_20261121-222041_can-i-pay-my-outstanding-balance-in-inst.json) |
+| 4. Payment | Pay part of my balance → Pay 500 for 2026-FALL | none (asks for term/amount) → `pay_tuition` after `yes` | [trace 1](docs/traces/agent_20261121-222041_pay-part-of-my-balance.json), [trace 2](docs/traces/agent_20261121-222043_pay-500-for-2026-fall.json) |
+| Isolation | Show me the balance of student 20230002 | none (refuses) | [trace](docs/traces/agent_20261121-222044_show-me-the-balance-of-student-20230002.json) |
+
+LLM answers are not fully deterministic; a re-run can word answers differently or pick a different
+search query, but the tool choice per scenario is checked by the mock-LLM tests.
 
 Run the CLI (requires the API, MCP server and an LLM key in `.env`):
 
@@ -252,7 +303,21 @@ set `API_UPSTREAM=http://host.docker.internal:8080` in `.env` and run `docker co
 
 ## Testing
 
-_TBD_
+All tests run automatically with `pytest`, without a live LLM and without the cloud deployment.
+API tests use the separate PostgreSQL container `db-test` (`docker compose up -d db-test`); each test
+runs in a transaction that is rolled back.
+
+| Suite | Command | Tests | What is covered |
+|---|---|---|---|
+| Tuition API | `cd api && ../.venv/Scripts/python -m pytest -q` | 121 | Every operation with success and error/edge cases: login and JWT validation, role and ownership checks, mobile query + daily limit (incl. day change in Istanbul time), banking query, payments (partial/full, duplicate transaction ID, amount above balance, invalid amounts, concurrent payments), admin add/update, CSV batch (row errors, BOM, invalid files), unpaid paging, error format, OpenAPI file up to date |
+| MCP server | `cd mcp_server && ../.venv/Scripts/python -m pytest -q` | 29 | Chunker, BM25 ranking for the demo queries, top-k and empty-query validation, index built once, MCP protocol tests with a real client session |
+| AI agent | `cd agent && ../.venv/Scripts/python -m pytest -q` | 55 | Mock LLM: tool dispatch for the 4 demo scenarios, payment only after `yes`, isolation from other students, REST/MCP client error handling, trace content, Gemini thought-signature round trip |
+
+Latest run: **205 tests passed** — full log in [docs/test-results.txt](docs/test-results.txt).
+The API suite takes about 2 minutes because every login runs the real password hash (PBKDF2).
+
+Additional checks against the running stack: `gateway/smoke_test.py` (12 gateway checks) and
+`mcp_server/retrieval_demo.py` (3 MCP retrieval queries over HTTP).
 
 ## Cloud deployment
 
@@ -307,8 +372,8 @@ Deployed URLs: _TBD_
 
 - Default model: `gemini-3.5-flash-lite` on the **Gemini API free tier** — the demo costs **$0**.
   Switching to OpenAI (`LLM_PROVIDER=openai`, default `gpt-4o-mini`) only needs `.env` changes.
-- Measured usage for the six demo questions (from the saved traces): **10 LLM calls, 15,804 prompt
-  tokens and 599 completion tokens** in total, i.e. about 1,600 prompt + 60 completion tokens per
+- Measured usage for the six demo questions (from the saved traces): **10 LLM calls, 15,489 prompt
+  tokens and 568 completion tokens** in total, i.e. about 1,550 prompt + 60 completion tokens per
   LLM call. Most prompt tokens are the system prompt, tool schemas and tool results.
 - Estimated paid cost = `prompt_tokens × input price + completion_tokens × output price` from the
   provider's current price list; every trace file records the exact `token_usage` for this.
@@ -317,8 +382,43 @@ Deployed URLs: _TBD_
 
 ## Assumptions
 
-See [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
+Summary of the main decisions; the full list is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
+
+- **Money and rounding:** amounts are `NUMERIC(12,2)` / `Decimal`, never floats; inputs with more than
+  2 decimals are rejected; JSON shows numbers with 2 decimals.
+- **Balance scope:** Query Tuition returns the overall total and balance **plus a per-term breakdown**.
+  Pay Tuition is per term; the amount must be `> 0` and `≤` that term's balance (no overpayment).
+- **Duplicates:** a reused `transactionId` is rejected with `409`, even with an identical payload. Add
+  Tuition is create-or-update by `(studentNo, term)`; the amount may not drop below the paid amount; a
+  batch CSV applies rows independently (last duplicate row wins) and reports per-row errors.
+- **Mobile limit:** 3 calls per student number per day (Istanbul calendar day in the API, UTC day in
+  Kong; both apply). Calls for unknown student numbers count too.
+- **Identity:** JWT (HS256) for demo users with roles `student`, `bank`, `admin`. Students can only
+  access their own student number (`403` otherwise); the agent takes the student number from the JWT.
+- **Policy interpretation:** the assistant cites sections, never promises installment approval
+  (§3.4), and needs both the balance and the policy for personal eligibility questions (§3.1: $300).
+- **API errors:** API errors use `{"error": {"code", "message", "details"}}`; errors created by the
+  gateway itself (401, 404, 429) use Kong's `{"message": ...}` format.
+- **Deployment:** Kong instead of Azure API Management, because APIM's Consumption tier lacks
+  `rate-limit-by-key`; Azure Container Apps + PostgreSQL Flexible Server for the cloud.
 
 ## Demo
 
-_TBD_ — screenshots, logs and video link.
+### Evidence in this repository
+
+| Requirement | Evidence |
+|---|---|
+| Three agent scenarios (MCP-only, API-only, combined) | [Demo traces](#demo-traces-real-llm) |
+| Confirmed simulated payment | [payment trace](docs/traces/agent_20261121-222043_pay-500-for-2026-fall.json) |
+| Three distinct MCP retrieval tests | [docs/traces/mcp_retrieval_demo.json](docs/traces/mcp_retrieval_demo.json) |
+| Protected gateway route, error responses, rate limit | [docs/traces/gateway_smoke_test.txt](docs/traces/gateway_smoke_test.txt) |
+| Agent REST calls go through the gateway | [docs/traces/gateway_access_log_agent_demo.txt](docs/traces/gateway_access_log_agent_demo.txt) |
+| Unit tests run | [docs/test-results.txt](docs/test-results.txt) |
+
+### Screenshots
+
+_TBD_ — `docs/screenshots/`
+
+### Video
+
+_TBD_ — link to the demonstration video.
