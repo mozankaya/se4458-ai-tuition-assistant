@@ -34,8 +34,16 @@ project progresses and summarized in the README.
   system of record for tuition assessment).
 - An update that would set `amount` below the already paid amount is rejected (`409 Conflict`).
 - Changing the currency of a record that already has payments is rejected (`409 Conflict`).
+- All tuition records of one student must use the same currency (`409 CURRENCY_MISMATCH`).
+- A zero amount is allowed (e.g. full scholarship); negative amounts are rejected.
+- The response is `201 CREATED` for a new record and `200 UPDATED` for an existing one.
 - In a batch CSV, each row is processed independently; duplicate `(studentNo, term)` rows in the same
   file are applied in order (last one wins) and each is reported.
+- Batch upload is `multipart/form-data` with a UTF-8 CSV file (BOM allowed, blank lines ignored, at most
+  10,000 rows). A wrong header, an empty file or a non-UTF-8 file rejects the whole upload
+  (`422 INVALID_CSV`). Otherwise the response is `200` with `status` `COMPLETED` (no errors), `PARTIAL`
+  or `FAILED` (no row succeeded), counts, and per-row errors with the CSV line number.
+- A sample file for the demo is in [samples/tuitions_batch_sample.csv](samples/tuitions_batch_sample.csv).
 
 ## Pay Tuition
 

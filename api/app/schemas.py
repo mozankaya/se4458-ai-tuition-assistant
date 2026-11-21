@@ -47,6 +47,41 @@ class PaymentResponse(CamelModel):
     currency: str
 
 
+class TuitionUpsertRequest(CamelModel):
+    student_no: str = Field(pattern=STUDENT_NO_PATTERN, examples=["20230006"])
+    term: str = Field(pattern=TERM_PATTERN, examples=["2026-FALL"])
+    amount: Decimal = Field(ge=0, max_digits=12, decimal_places=2, examples=[3000.00])
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$", examples=["USD"])
+
+
+class TuitionUpsertResponse(CamelModel):
+    status: str = Field(description="CREATED or UPDATED", examples=["CREATED"])
+    student_no: str
+    term: str
+    amount: Money
+    paid_amount: Money
+    balance: Money
+    currency: str
+
+
+class BatchRowError(CamelModel):
+    line: int = Field(description="Line number in the CSV file (header is line 1)")
+    student_no: str | None
+    term: str | None
+    code: str
+    message: str
+
+
+class BatchResult(CamelModel):
+    status: str = Field(description="COMPLETED, PARTIAL or FAILED", examples=["PARTIAL"])
+    total_rows: int
+    success_count: int
+    failure_count: int
+    created_count: int
+    updated_count: int
+    errors: list[BatchRowError]
+
+
 class TuitionSummary(CamelModel):
     """Overall totals for a student plus a per-term breakdown."""
 
