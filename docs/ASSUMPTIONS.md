@@ -122,6 +122,17 @@ project progresses and summarized in the README.
   existing data is kept). `python -m app.seed --reset` is the explicit way to restore the demo data.
 - The MCP image contains a copy of the policy document and indexes it once at start-up.
 
+## Cloud deployment
+
+- Azure Container Apps runs the gateway, API and MCP server; Azure Database for PostgreSQL Flexible
+  Server is the managed database. Kong runs as a Container App instead of Azure API Management (see
+  API Gateway below).
+- The API uses internal ingress, so in the cloud as well the REST API is reachable only through Kong.
+- Each app runs exactly one replica (min = max = 1): the gateway's in-memory rate-limit counters stay
+  exact and there are no cold starts during the demo.
+- PostgreSQL allows connections from Azure services only and requires SSL (`sslmode=require`).
+- Images are built in Azure (`az acr build`) so the deployment does not depend on local Docker.
+
 ## API Gateway
 
 - Kong (DB-less, declarative config) is used as the gateway, locally and in the cloud, so the same

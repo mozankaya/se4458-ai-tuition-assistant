@@ -256,7 +256,52 @@ _TBD_
 
 ## Cloud deployment
 
-_TBD_
+Target: **Microsoft Azure**, created by one script: [deploy/azure/deploy.ps1](deploy/azure/deploy.ps1).
+
+```text
+Internet ──HTTPS──► tuition-gateway (Kong, Container App, external) ──► tuition-api (Container App, internal only)
+                                                                             │
+                                                                             ▼
+                                                     Azure Database for PostgreSQL Flexible Server
+Agent CLI ──HTTPS──► tuition-mcp (MCP server, Container App, external)
+```
+
+| Resource | Azure service | Notes |
+|---|---|---|
+| `tuition-gateway` | Container Apps | Kong image with `gateway/kong.yml` baked in; the only public REST entry point |
+| `tuition-api` | Container Apps | Internal ingress: not reachable from the internet, only through the gateway |
+| `tuition-mcp` | Container Apps | Public HTTPS endpoint `/mcp` for the agent's MCP client |
+| `tuition-pg-*` | PostgreSQL Flexible Server | Burstable B1ms, PostgreSQL 16, SSL required, accessible from Azure services only |
+| `tuitionacr*` | Container Registry (Basic) | Images are built in Azure with `az acr build` |
+
+Secrets (`JWT_SECRET`, database URL, demo password) are stored as Container Apps secrets, never in
+images or in the repository.
+
+### Deploy
+
+1. Install the Azure CLI, then `az login` and check `az account show --output table`.
+2. In `.env`, set a random `JWT_SECRET` and an `AZURE_POSTGRES_PASSWORD`, e.g.:
+
+   ```powershell
+   # random 64-character hex string for JWT_SECRET (works in Windows PowerShell 5.1)
+   $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | ForEach-Object { $_.ToString('x2') })
+   ```
+
+3. Preview, then deploy (about 15-20 minutes the first time):
+
+   ```powershell
+   ./deploy/azure/deploy.ps1 -DryRun
+   ./deploy/azure/deploy.ps1 -Location westeurope
+   ```
+
+4. The script prints the gateway and MCP URLs. Point the agent at the cloud by setting
+   `GATEWAY_BASE_URL` and `MCP_SERVER_URL` in `.env`.
+
+Cost and clean-up: the demo uses Azure for Students credit (PostgreSQL B1ms is the main cost; one
+small replica per Container App). Delete everything with
+`az group delete --name rg-tuition-assistant --yes --no-wait`.
+
+Deployed URLs: _TBD_
 
 ## LLM cost
 
