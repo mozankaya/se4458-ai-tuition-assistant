@@ -2,15 +2,21 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, require_roles
 from app.db import get_db
 from app.errors import ErrorResponse
 from app.models import ROLE_ADMIN
-from app.schemas import BatchResult, TuitionUpsertRequest, TuitionUpsertResponse
-from app.services.admin import process_batch_csv, upsert_tuition
+from app.schemas import (
+    TERM_PATTERN,
+    BatchResult,
+    TuitionUpsertRequest,
+    TuitionUpsertResponse,
+    UnpaidTuitionPage,
+)
+from app.services.admin import list_unpaid, process_batch_csv, upsert_tuition
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -50,6 +56,28 @@ def add_tuition(
     db.commit()
     response.status_code = 201 if result.status == "CREATED" else 200
     return result
+
+
+@router.get(
+    "/tuitions/unpaid",
+    response_model=UnpaidTuitionPage,
+    response_model_by_alias=True,
+    summary="Unpaid tuition status (paged)",
+    description=(
+        "Lists tuition records with an outstanding balance (`balance > 0`), ordered by student number "
+        "and term. Filter by `term` or omit it for all terms. `page` starts at 1; `pageSize` is 1-100 "
+        "(default 20). A page past the end returns an empty `items` list."
+    ),
+    responses={**AUTH_ERRORS, 422: {"model": ErrorResponse, "description": "Invalid query parameters"}},
+)
+def unpaid_tuition_status(
+    _: AdminUser,
+    db: Annotated[Session, Depends(get_db)],
+    term: Annotated[str | None, Query(pattern=TERM_PATTERN, examples=["2026-FALL"])] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(alias="pageSize", ge=1, le=100)] = 20,
+) -> UnpaidTuitionPage:
+    return list_unpaid(db, term, page, page_size)
 
 
 @router.post(

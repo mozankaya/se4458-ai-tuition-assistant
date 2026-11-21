@@ -45,6 +45,13 @@ project progresses and summarized in the README.
   or `FAILED` (no row succeeded), counts, and per-row errors with the CSV line number.
 - A sample file for the demo is in [samples/tuitions_batch_sample.csv](samples/tuitions_batch_sample.csv).
 
+## Unpaid Tuition Status
+
+- "Unpaid" means a tuition record with `balance > 0` (partially paid records are included).
+- `term` is optional; without it all terms are listed. Results are ordered by student number, then term.
+- Offset paging: `page` starts at 1, `pageSize` is 1-100 (default 20). A page past the end returns `200`
+  with an empty `items` list; `totalItems` and `totalPages` are always returned.
+
 ## Pay Tuition
 
 - Payments are simulated; no card processing. Each successful call returns `201` with `status: SUCCESS`.

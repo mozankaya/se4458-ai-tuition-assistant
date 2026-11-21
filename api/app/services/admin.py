@@ -2,15 +2,23 @@
 
 import csv
 import io
+import math
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.errors import ApiError
 from app.models import Student, Tuition
-from app.schemas import BatchResult, BatchRowError, TuitionUpsertRequest, TuitionUpsertResponse
+from app.schemas import (
+    BatchResult,
+    BatchRowError,
+    TuitionUpsertRequest,
+    TuitionUpsertResponse,
+    UnpaidTuitionItem,
+    UnpaidTuitionPage,
+)
 
 CSV_COLUMNS = ["studentNo", "term", "amount", "currency"]
 MAX_BATCH_ROWS = 10_000
@@ -83,6 +91,43 @@ def upsert_tuition(db: Session, request: TuitionUpsertRequest) -> TuitionUpsertR
         paid_amount=tuition.paid_amount,
         balance=tuition.balance,
         currency=tuition.currency,
+    )
+
+
+def list_unpaid(db: Session, term: str | None, page: int, page_size: int) -> UnpaidTuitionPage:
+    """Paged list of tuition records with an outstanding balance, ordered by student number and term."""
+    conditions = [Tuition.amount > Tuition.paid_amount]
+    if term is not None:
+        conditions.append(Tuition.term == term)
+
+    total = db.scalar(select(func.count()).select_from(Tuition).where(*conditions))
+    rows = db.execute(
+        select(Tuition, Student)
+        .join(Student)
+        .where(*conditions)
+        .order_by(Student.student_no, Tuition.term)
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    ).all()
+
+    return UnpaidTuitionPage(
+        term=term,
+        page=page,
+        page_size=page_size,
+        total_items=total,
+        total_pages=math.ceil(total / page_size),
+        items=[
+            UnpaidTuitionItem(
+                student_no=student.student_no,
+                full_name=student.full_name,
+                term=tuition.term,
+                tuition_total=tuition.amount,
+                paid_amount=tuition.paid_amount,
+                balance=tuition.balance,
+                currency=tuition.currency,
+            )
+            for tuition, student in rows
+        ],
     )
 
 

@@ -82,6 +82,25 @@ class BatchResult(CamelModel):
     errors: list[BatchRowError]
 
 
+class UnpaidTuitionItem(CamelModel):
+    student_no: str
+    full_name: str | None
+    term: str
+    tuition_total: Money
+    paid_amount: Money
+    balance: Money
+    currency: str
+
+
+class UnpaidTuitionPage(CamelModel):
+    term: str | None = Field(description="Term filter, or null for all terms")
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    items: list[UnpaidTuitionItem]
+
+
 class TuitionSummary(CamelModel):
     """Overall totals for a student plus a per-term breakdown."""
 
