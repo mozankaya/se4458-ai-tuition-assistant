@@ -143,6 +143,18 @@ agent executes them (MCP for policy, REST via the gateway for live data) → res
 - **Tool trace:** every question prints the tool names, inputs and results, and saves a JSON file
   (`docs/traces/agent_<timestamp>_<question>.json`) with the final answer and LLM token usage.
 
+### Demo traces (real LLM)
+
+Recorded with `gemini-3.5-flash-lite`, user `student1`, fresh seed data:
+
+| Scenario | Question | Tools selected by the LLM | Trace |
+|---|---|---|---|
+| 1. MCP only | When is the payment deadline? | `search_tuition_policies` | [trace](docs/traces/agent_20261121-174839_when-is-the-payment-deadline.json) |
+| 2. API only | What is my balance? | `get_my_tuition` | [trace](docs/traces/agent_20261121-174840_what-is-my-balance.json) |
+| 3. Combined | Can I pay my outstanding balance in installments? | `get_my_tuition` + `search_tuition_policies` | [trace](docs/traces/agent_20261121-174843_can-i-pay-my-outstanding-balance-in-inst.json) |
+| 4. Payment | Pay part of my balance → Pay 500 for 2026-FALL | none (asks for term/amount) → `pay_tuition` after `yes` | [trace 1](docs/traces/agent_20261121-174844_pay-part-of-my-balance.json), [trace 2](docs/traces/agent_20261121-174845_pay-500-for-2026-fall.json) |
+| Isolation | Show me the balance of student 20230002 | none (refuses) | [trace](docs/traces/agent_20261121-174846_show-me-the-balance-of-student-20230002.json) |
+
 Run the CLI (requires the API, MCP server and an LLM key in `.env`):
 
 ```bash
@@ -184,7 +196,15 @@ _TBD_
 
 ## LLM cost
 
-_TBD_
+- Default model: `gemini-3.5-flash-lite` on the **Gemini API free tier** — the demo costs **$0**.
+  Switching to OpenAI (`LLM_PROVIDER=openai`, default `gpt-4o-mini`) only needs `.env` changes.
+- Measured usage for the six demo questions (from the saved traces): **10 LLM calls, 15,804 prompt
+  tokens and 599 completion tokens** in total, i.e. about 1,600 prompt + 60 completion tokens per
+  LLM call. Most prompt tokens are the system prompt, tool schemas and tool results.
+- Estimated paid cost = `prompt_tokens × input price + completion_tokens × output price` from the
+  provider's current price list; every trace file records the exact `token_usage` for this.
+- **Low-cost / testable approach:** all automated tests use a scripted mock LLM (no API key, no
+  network, no cost). The live LLM is only needed for the interactive demo.
 
 ## Assumptions
 

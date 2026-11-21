@@ -107,6 +107,12 @@ project progresses and summarized in the README.
 - No tool takes a student number. The agent always uses the student number of the logged-in user
   (JWT), so a number typed in a prompt cannot be used to read or pay for another student.
 - The agent, not the LLM, generates the payment `transactionId` (UUID).
+- Default Gemini model is `gemini-3.5-flash-lite`: in November 2026 the `gemini-2.x` models returned
+  `404` on the OpenAI-compatible endpoint for this key and `gemini-3.5-flash` was often overloaded
+  (`503`). Gemini 3 requires the `thought_signature` of each tool call to be sent back, so the agent
+  replays tool calls unchanged.
+- If the LLM provider fails in the middle of a question, the question is removed from the chat
+  history, and any payment that already succeeded is still reported to the user so it is not repeated.
 
 ## API Gateway
 
