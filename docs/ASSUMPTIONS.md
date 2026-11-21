@@ -41,6 +41,14 @@ project progresses and summarized in the README.
 
 - Authentication uses JWT bearer tokens issued by `POST /api/v1/auth/login` for seeded demo users.
 - Roles: `student`, `bank`, `admin`.
+- Token claims: `sub` (username), `role`, `student_no` (students only), `iss`, `iat`, `exp`. Tokens are
+  HS256-signed and expire after `JWT_EXPIRE_MINUTES` (default 60). There is no refresh token; the client
+  logs in again.
+- On every request the user is re-loaded from the database, so a deactivated account loses access
+  immediately even with an unexpired token.
+- Login returns the same `401 INVALID_CREDENTIALS` for unknown users and wrong passwords, and performs a
+  password hash comparison in both cases to avoid revealing valid usernames.
+- Errors use one format everywhere: `{"error": {"code": "...", "message": "...", "details": ...}}`.
 - Banking endpoints accept the `bank` role (any student) and the `student` role (own student number only).
   The student number is taken from the token subject; a mismatching path/body value returns `403`.
 
