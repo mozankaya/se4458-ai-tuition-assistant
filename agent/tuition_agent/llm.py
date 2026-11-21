@@ -16,6 +16,9 @@ class ToolCall:
     arguments: dict[str, Any]
     raw_arguments: str
     argument_error: str | None = None  # set when the LLM produced invalid JSON
+    # Provider-specific fields that must be sent back unchanged, e.g. Gemini's
+    # extra_content.google.thought_signature (required by Gemini 3 for multi-step tool calling).
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -29,7 +32,8 @@ class LLMResponse:
         message: dict[str, Any] = {"role": "assistant", "content": self.content}
         if self.tool_calls:
             message["tool_calls"] = [
-                {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": c.raw_arguments}}
+                {**c.extra, "id": c.id, "type": "function",
+                 "function": {"name": c.name, "arguments": c.raw_arguments}}
                 for c in self.tool_calls
             ]
         return message
@@ -74,8 +78,10 @@ class OpenAICompatibleLLM:
         tool_calls = []
         for call in message.tool_calls or []:
             arguments, error = _parse_arguments(call.function.arguments)
+            extra = {k: v for k, v in call.model_dump(exclude_none=True).items() if k not in {"id", "type", "function"}}
             tool_calls.append(ToolCall(id=call.id, name=call.function.name, arguments=arguments,
-                                       raw_arguments=call.function.arguments or "{}", argument_error=error))
+                                       raw_arguments=call.function.arguments or "{}", argument_error=error,
+                                       extra=extra))
         usage = {}
         if completion.usage is not None:
             usage = {"prompt_tokens": completion.usage.prompt_tokens,

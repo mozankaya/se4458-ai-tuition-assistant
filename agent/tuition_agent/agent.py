@@ -47,6 +47,19 @@ class PaymentSummary:
 ConfirmPayment = Callable[[PaymentSummary], bool]
 
 
+class AgentError(Exception):
+    """The LLM provider failed mid-question; `trace` holds the tool calls that already ran."""
+
+    def __init__(self, message: str, trace: InteractionTrace) -> None:
+        super().__init__(message)
+        self.trace = trace
+
+    @property
+    def completed_payments(self) -> list[dict[str, Any]]:
+        return [e.result for e in self.trace.tool_calls
+                if e.tool == PAY_TUITION and isinstance(e.result, dict) and e.result.get("status") == "SUCCESS"]
+
+
 def _error(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
@@ -70,8 +83,22 @@ class TuitionAgent:
         self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     def ask(self, question: str) -> InteractionTrace:
+        """Answer one question.
+
+        If the LLM call fails, the question is removed from the history again so a provider error does
+        not break the following questions, and an AgentError carrying the partial trace is raised: tools
+        that already ran (e.g. a confirmed payment) must still be reported to the user.
+        """
+        history_length = len(self.messages)
         trace = InteractionTrace(question=question, user=self.api.username, student_no=self.api.student_no,
                                  llm=self.llm_label)
+        try:
+            return self._ask(question, trace)
+        except Exception as exc:
+            del self.messages[history_length:]
+            raise AgentError(f"{exc.__class__.__name__}: {exc}", trace) from exc
+
+    def _ask(self, question: str, trace: InteractionTrace) -> InteractionTrace:
         self.messages.append({"role": "user", "content": question})
 
         for _ in range(self.max_steps):

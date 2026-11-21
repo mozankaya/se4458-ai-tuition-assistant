@@ -12,7 +12,7 @@ import getpass
 import os
 import sys
 
-from tuition_agent.agent import PaymentSummary, TuitionAgent
+from tuition_agent.agent import AgentError, PaymentSummary, TuitionAgent
 from tuition_agent.api_client import ApiCallError, TuitionApiClient
 from tuition_agent.config import get_settings
 from tuition_agent.llm import OpenAICompatibleLLM
@@ -94,8 +94,16 @@ def main() -> None:
 
         try:
             trace = agent.ask(question)
-        except Exception as exc:  # keep the chat alive if the LLM provider fails
-            print(f"Assistant error: {exc.__class__.__name__}: {exc}")
+        except AgentError as exc:  # keep the chat alive if the LLM provider fails
+            if not args.no_trace:
+                print(format_trace(exc.trace))
+            print(f"\nAssistant error: {exc}")
+            for payment in exc.completed_payments:
+                print(f"NOTE: payment {payment['transactionId']} of {payment['paidAmount']:.2f} "
+                      f"{payment['currency']} for {payment['term']} WAS recorded. "
+                      f"Remaining balance: {payment['remainingBalance']:.2f}. Do not pay again.")
+            exc.trace.final_answer = f"(error) {exc}"
+            print(f"(trace saved to {save_trace(exc.trace, settings.trace_dir)})")
             continue
         if not args.no_trace:
             print(format_trace(trace))

@@ -12,7 +12,7 @@ PROVIDER_BASE_URLS = {
     "openai": None,  # SDK default: https://api.openai.com/v1
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
 }
-DEFAULT_MODELS = {"openai": "gpt-4o-mini", "gemini": "gemini-2.5-flash"}
+DEFAULT_MODELS = {"openai": "gpt-4o-mini", "gemini": "gemini-3.5-flash-lite"}
 
 
 class AgentSettings(BaseSettings):

@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from tests.fakes import FakeApi, FakePolicies, ScriptedLLM, calls, says, tool_call
-from tuition_agent.agent import PaymentSummary, TuitionAgent
+from tuition_agent.agent import AgentError, PaymentSummary, TuitionAgent
 from tuition_agent.trace import format_trace, save_trace
 
 
@@ -70,6 +70,42 @@ def test_conversation_history_is_kept_between_questions():
 
     roles = [m["role"] for m in llm.calls[1]]
     assert roles == ["system", "user", "assistant", "user"]
+
+
+def test_llm_failure_does_not_corrupt_history():
+    class FailingSecondCall(ScriptedLLM):
+        def complete(self, messages, tools):
+            if len(self.calls) == 1:
+                self.calls.append(messages)
+                raise RuntimeError("provider error")
+            return super().complete(messages, tools)
+
+    llm = FailingSecondCall(calls(tool_call("get_my_tuition", call_id="a")), says("Recovered."))
+    agent, *_ = _agent(llm)
+
+    with pytest.raises(AgentError) as exc:
+        agent.ask("What is my balance?")
+    assert [m["role"] for m in agent.messages] == ["system"]
+    assert [e.tool for e in exc.value.trace.tool_calls] == ["get_my_tuition"]
+
+    assert agent.ask("hello").final_answer == "Recovered."
+
+
+def test_payment_done_before_llm_failure_is_reported():
+    class FailAfterPayment(ScriptedLLM):
+        def complete(self, messages, tools):
+            if self.calls:
+                raise RuntimeError("provider error")
+            return super().complete(messages, tools)
+
+    llm = FailAfterPayment(calls(tool_call("pay_tuition", {"term": "2026-FALL", "amount": 100})))
+    agent, api, *_ = _agent(llm, confirm=lambda s: True)
+
+    with pytest.raises(AgentError) as exc:
+        agent.ask("Pay 100 for fall")
+
+    assert len(api.payments) == 1
+    assert [p["paidAmount"] for p in exc.value.completed_payments] == [100.0]
 
 
 def test_loop_stops_after_max_steps():

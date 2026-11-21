@@ -94,13 +94,24 @@ def test_assistant_message_round_trips_tool_calls():
     }
 
 
+def test_gemini_thought_signature_is_sent_back_unchanged():
+    signed_call = {**_tool_call("call_1", "get_my_tuition", "{}"),
+                   "extra_content": {"google": {"thought_signature": "sig-123"}}}
+    fake = FakeOpenAI(_completion(tool_calls=[signed_call]))
+
+    message = OpenAICompatibleLLM(_settings(), client=fake).complete([], TOOL_DEFINITIONS).as_message()
+
+    assert message["tool_calls"][0]["extra_content"] == {"google": {"thought_signature": "sig-123"}}
+    assert message["tool_calls"][0]["function"] == {"name": "get_my_tuition", "arguments": "{}"}
+
+
 # --- Provider configuration ----------------------------------------------------------------------
 
 def test_gemini_uses_openai_compatible_endpoint_and_default_model():
     settings = _settings(llm_provider="gemini", gemini_api_key="k")
 
     assert settings.resolved_base_url == "https://generativelanguage.googleapis.com/v1beta/openai/"
-    assert settings.resolved_model == "gemini-2.5-flash"
+    assert settings.resolved_model == "gemini-3.5-flash-lite"
     assert settings.api_key == "k"
 
 
