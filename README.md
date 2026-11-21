@@ -84,7 +84,44 @@ _TBD_ — gateway URL, route mapping, protected route, sample error response.
 - Embeddings were not used: the document is small and BM25 ranks the expected sections first for the
   demo queries (see `mcp_server/tests/test_index.py`).
 
-_TBD_ — tool schema and server.
+### Server and tool schema
+
+A real MCP server built with the official Python SDK (`mcp` 1.x, `FastMCP`), served over the
+**streamable HTTP** transport at `http://localhost:8001/mcp` (health check: `GET /health`).
+
+| Tool | `search_tuition_policies` |
+|---|---|
+| Input | `query: string` (required, non-empty), `top_k: integer` (1-10, default 3) |
+| Output | `{"document": "University_Tuition_Policies.md", "matches": [{"section", "heading", "text", "score"}]}` |
+
+Example output (shortened):
+
+```json
+{
+  "document": "University_Tuition_Policies.md",
+  "matches": [
+    {"section": "4.1", "heading": "Late fee rule", "text": "A **2% one-time late fee** may be assessed ...", "score": 9.6821}
+  ]
+}
+```
+
+### Running the server and the three retrieval tests
+
+```bash
+cd mcp_server
+../.venv/Scripts/python -m pip install -r requirements-dev.txt
+../.venv/Scripts/python server.py            # terminal 1
+../.venv/Scripts/python retrieval_demo.py    # terminal 2: runs 3 queries via an MCP client
+```
+
+`retrieval_demo.py` connects with a real MCP client over HTTP and saves the results to
+[docs/traces/mcp_retrieval_demo.json](docs/traces/mcp_retrieval_demo.json):
+
+| Query | Top sections |
+|---|---|
+| When is the payment deadline? | 2.2 Spring term, 2.1 Fall term, 2.3 Payment posting |
+| Can I pay my balance in installments? | 8.2 FAQ on installments, 8.4, 3.2 Number and size of installments |
+| What happens if I pay late? Is there a late fee? | 4.1 Late fee rule, 4.2 Example, 4.3 Exceptions |
 
 ## AI Agent
 
