@@ -15,6 +15,24 @@ project progresses and summarized in the README.
 - Pay Tuition is term-specific: `amount` must be positive and must not exceed that term's outstanding balance.
   Overpayments are not supported.
 
+## Data model
+
+- Terms are free-form strings validated against `YYYY-FALL`, `YYYY-SPRING` or `YYYY-SUMMER`.
+- Each student has at most one tuition record per term (`UNIQUE (student_id, term)`).
+- `tuitions.paid_amount` is a running total updated in the same transaction as each payment insert;
+  `payments` is the immutable audit trail. See [er-diagram.md](er-diagram.md).
+
+## Add Tuition duplicate handling
+
+- Add Tuition is create-or-update keyed by `(studentNo, term)`: an existing record's amount and currency
+  are replaced; otherwise a new record is created.
+- If the student number does not exist yet, the student record is created automatically (admin is the
+  system of record for tuition assessment).
+- An update that would set `amount` below the already paid amount is rejected (`409 Conflict`).
+- Changing the currency of a record that already has payments is rejected (`409 Conflict`).
+- In a batch CSV, each row is processed independently; duplicate `(studentNo, term)` rows in the same
+  file are applied in order (last one wins) and each is reported.
+
 ## Identity and authorization
 
 - Authentication uses JWT bearer tokens issued by `POST /api/v1/auth/login` for seeded demo users.
