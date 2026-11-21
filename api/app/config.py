@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     database_url: str = ""
+    test_database_url: str = ""
+    seed_demo_password: str = ""
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
