@@ -1,0 +1,100 @@
+{
+  "server": "tuition-policies",
+  "url": "http://13.48.42.90:8001/mcp",
+  "timestamp": "2026-11-22T17:46:08+00:00",
+  "tools": [
+    "search_tuition_policies"
+  ],
+  "queries": [
+    {
+      "tool": "search_tuition_policies",
+      "input": {
+        "query": "When is the payment deadline?",
+        "top_k": 3
+      },
+      "result": {
+        "document": "University_Tuition_Policies.md",
+        "matches": [
+          {
+            "section": "2.2",
+            "heading": "Spring term",
+            "text": "The payment deadline for the Spring 2027 term is **February 15, 2027**. Deadlines apply in the university's local time zone.",
+            "score": 3.904
+          },
+          {
+            "section": "2.1",
+            "heading": "Fall term",
+            "text": "The payment deadline for the Fall 2026 term is **September 30, 2026**. A student should settle the outstanding balance or have an approved installment arrangement by that date.",
+            "score": 3.4697
+          },
+          {
+            "section": "2.3",
+            "heading": "Payment posting",
+            "text": "Payments recorded through supported banking channels may take up to **two business days** to appear in the university account. Students should check their current balance through the Tuition Query API rather than assume a payment has already posted.",
+            "score": 2.5259
+          }
+        ]
+      }
+    },
+    {
+      "tool": "search_tuition_policies",
+      "input": {
+        "query": "Can I pay my balance in installments?",
+        "top_k": 3
+      },
+      "result": {
+        "document": "University_Tuition_Policies.md",
+        "matches": [
+          {
+            "section": "8.2",
+            "heading": "Can I pay my balance in three installments?",
+            "text": "The policy permits up to three installments for eligible balances, subject to approval. Check the live balance through the Tuition Query API and see Sections 3.1\u20133.4.",
+            "score": 2.9882
+          },
+          {
+            "section": "8.4",
+            "heading": "Can the assistant pay my tuition automatically?",
+            "text": "No. The assistant must obtain explicit confirmation before calling the payment API. See Section 7.3.",
+            "score": 1.8456
+          },
+          {
+            "section": "3.2",
+            "heading": "Number and size of installments",
+            "text": "An approved balance may be divided into **up to three installments**. Installments should be equal where possible; any rounding difference is added to the final installment. For example, a $3,000 balance can be divided into three payments of $1,000.",
+            "score": 1.7988
+          }
+        ]
+      }
+    },
+    {
+      "tool": "search_tuition_policies",
+      "input": {
+        "query": "What happens if I pay late? Is there a late fee?",
+        "top_k": 3
+      },
+      "result": {
+        "document": "University_Tuition_Policies.md",
+        "matches": [
+          {
+            "section": "4.1",
+            "heading": "Late fee rule",
+            "text": "A **2% one-time late fee** may be assessed on an overdue amount after the applicable due date, unless an approved exception applies. This document describes the rule but does not calculate or post fees automatically.",
+            "score": 9.6821
+          },
+          {
+            "section": "4.2",
+            "heading": "Example",
+            "text": "If $1,000 is overdue and no exception applies, the illustrative late fee is $20. Whether a fee has actually been posted must be checked in the tuition system.",
+            "score": 9.3024
+          },
+          {
+            "section": "4.3",
+            "heading": "Exceptions",
+            "text": "Students with a documented university-approved deferral may be exempt. Approval status is not available from this document.",
+            "score": 7.3239
+          }
+        ]
+      }
+    }
+  ]
+}

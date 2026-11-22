@@ -21,7 +21,7 @@ Gateway: http://localhost:8000
 [PASS] mobile query #4 (rate limited, keyed by student number): GET /api/v1/mobile/tuition/20230003 -> 429 (expected 429, answered by: gateway itself)
        body: {
   "message":"Daily query limit of 3 reached for this student number",
-  "request_id":"2fa910769be8ee3290582751423dfa4c"
+  "request_id":"13491276a1f4ba042274722e0d18b26d"
 }
        rate-limit headers: limit=3 remaining=0
 [PASS] mobile query for a different student is not affected: GET /api/v1/mobile/tuition/20230004 -> 200 (expected 200, answered by: 1.1 kong/3.9.5)
@@ -29,7 +29,7 @@ Gateway: http://localhost:8000
 [PASS] unknown route: GET /api/v2/tuition/20230001 -> 404 (expected 404, answered by: gateway itself)
        body: {
   "message":"no Route matched with those values",
-  "request_id":"d6bad70648d4b54adc7b76750172b371"
+  "request_id":"9f8c6e2579fe270d60a1277c2d736a5c"
 }
 
 ALL CHECKS PASSED

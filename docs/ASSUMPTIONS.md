@@ -124,14 +124,18 @@ project progresses and summarized in the README.
 
 ## Cloud deployment
 
-- Azure Container Apps runs the gateway, API and MCP server; Azure Database for PostgreSQL Flexible
-  Server is the managed database. Kong runs as a Container App instead of Azure API Management (see
-  API Gateway below).
-- The API uses internal ingress, so in the cloud as well the REST API is reachable only through Kong.
-- Each app runs exactly one replica (min = max = 1): the gateway's in-memory rate-limit counters stay
-  exact and there are no cold starts during the demo.
-- PostgreSQL allows connections from Azure services only and requires SSL (`sslmode=require`).
-- Images are built in Azure (`az acr build`) so the deployment does not depend on local Docker.
+- The system runs on **AWS**: one EC2 instance (`c7i-flex.large`, Ubuntu 24.04, `eu-north-1`) runs the
+  same docker compose stack as locally (PostgreSQL, Tuition API, MCP server, Kong). A single VM keeps
+  the cloud setup identical to the tested local setup and fits in the AWS Free plan credits.
+- The security group opens only ports 8000 (Kong) and 8001 (MCP). PostgreSQL and the API are not
+  reachable from the internet, so REST traffic in the cloud also goes only through the gateway.
+- PostgreSQL runs as a container on the VM (a server database, not a managed service); its data is
+  stored in a Docker volume on the VM disk.
+- The endpoints use plain HTTP on the instance's public IP; TLS and a domain name were out of scope.
+- Secrets are generated on the VM at first boot (`openssl rand`) and never stored in the repository.
+- Azure (Container Apps) and Google Cloud (VM) deployment scripts are included but were not executed:
+  the Azure accounts stayed in manual review and Google Cloud required a prepayment for accounts from
+  Turkey.
 
 ## API Gateway
 
