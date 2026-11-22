@@ -32,6 +32,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="API Gateway smoke test")
     parser.add_argument("--gateway", default="http://localhost:8000")
     parser.add_argument("--student", default="20230003", help="student number used for the rate-limit check")
+    parser.add_argument("--output", type=Path, default=OUTPUT, help="where to save the report")
     args = parser.parse_args()
 
     client = httpx.Client(base_url=args.gateway, timeout=15)
@@ -76,8 +77,8 @@ def main() -> None:
     lines += ["", f"{'ALL CHECKS PASSED' if failures == 0 else f'{failures} CHECK(S) FAILED'}"]
     report = "\n".join(lines)
     print(report)
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(report + "\n", encoding="utf-8")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(report + "\n", encoding="utf-8")
     sys.exit(1 if failures else 0)
 
 

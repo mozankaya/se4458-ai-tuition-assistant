@@ -14,7 +14,8 @@
 # Delete everything afterwards (commands are printed at the end).
 set -euo pipefail
 
-export AWS_DEFAULT_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-central-1}}"
+# New Free plan accounts may be limited to some regions; eu-north-1 (Stockholm) is allowed.
+export AWS_DEFAULT_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-north-1}}"
 NAME="tuition-vm"
 SG_NAME="tuition-sg"
 # Free plan eligible types (accounts created after 15 July 2025): t3.micro, t3.small, t4g.micro,

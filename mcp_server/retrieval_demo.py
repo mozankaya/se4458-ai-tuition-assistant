@@ -46,6 +46,7 @@ async def run(url: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--url", default="http://localhost:8001/mcp")
+    parser.add_argument("--output", type=Path, default=OUTPUT_PATH, help="where to save the results")
     args = parser.parse_args()
 
     report = asyncio.run(run(args.url))
@@ -53,9 +54,9 @@ def main() -> None:
         print(f"\nQ: {item['input']['query']}")
         for match in item["result"]["matches"]:
             print(f"  [{match['section']}] {match['heading']} (score {match['score']})")
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"\nSaved to {OUTPUT_PATH}")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"\nSaved to {args.output}")
 
 
 if __name__ == "__main__":
