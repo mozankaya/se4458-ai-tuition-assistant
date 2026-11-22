@@ -44,7 +44,9 @@ class PaymentSummary:
         return self.current_balance - self.amount
 
 
-ConfirmPayment = Callable[[PaymentSummary], bool]
+# Returns True (confirmed), False (cancelled) or None (ask later: the web UI shows Confirm/Cancel buttons
+# and calls TuitionAgent.resolve_pending_payment when the user clicks one).
+ConfirmPayment = Callable[[PaymentSummary], bool | None]
 
 
 class AgentError(Exception):
@@ -81,6 +83,7 @@ class TuitionAgent:
         self.llm_label = llm_label
         self.max_steps = max_steps
         self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self.pending_payment: PaymentSummary | None = None
 
     def ask(self, question: str) -> InteractionTrace:
         """Answer one question.
@@ -89,11 +92,46 @@ class TuitionAgent:
         not break the following questions, and an AgentError carrying the partial trace is raised: tools
         that already ran (e.g. a confirmed payment) must still be reported to the user.
         """
+        trace = self._new_trace(question)
+        return self._run_safely(question, trace)
+
+    def resolve_pending_payment(self, approved: bool) -> InteractionTrace:
+        """Finish a payment that is waiting for the user's decision (web UI Confirm/Cancel buttons).
+
+        The payment API is called only here, after an explicit approval. The outcome is then given to the
+        LLM so it can report it to the user.
+        """
+        summary = self.pending_payment
+        if summary is None:
+            raise ValueError("No payment is waiting for confirmation")
+        self.pending_payment = None
+
+        action = "Confirm" if approved else "Cancel"
+        trace = self._new_trace(f"[{action} payment of {summary.amount:.2f} {summary.currency} for {summary.term}]")
+        started = time.monotonic()
+        if approved:
+            try:
+                result = self.api.pay_tuition(summary.term, summary.amount, str(uuid.uuid4()))
+            except ApiCallError as exc:
+                result = exc.to_dict()
+        else:
+            result = {"status": "CANCELLED", "message": "The user cancelled the payment. Nothing was paid."}
+        trace.tool_calls.append(ToolTraceEntry(
+            step=1, tool=PAY_TUITION, input={"term": summary.term, "amount": float(summary.amount)}, result=result,
+            duration_ms=int((time.monotonic() - started) * 1000), confirmation="yes" if approved else "no"))
+
+        note = (f"The user {'confirmed' if approved else 'cancelled'} the pending payment in the interface. "
+                f"pay_tuition result: {json.dumps(result, ensure_ascii=False)}. Report the outcome to the user.")
+        return self._run_safely(note, trace)
+
+    def _new_trace(self, question: str) -> InteractionTrace:
+        return InteractionTrace(question=question, user=self.api.username, student_no=self.api.student_no,
+                                llm=self.llm_label)
+
+    def _run_safely(self, user_message: str, trace: InteractionTrace) -> InteractionTrace:
         history_length = len(self.messages)
-        trace = InteractionTrace(question=question, user=self.api.username, student_no=self.api.student_no,
-                                 llm=self.llm_label)
         try:
-            return self._ask(question, trace)
+            return self._ask(user_message, trace)
         except Exception as exc:
             del self.messages[history_length:]
             raise AgentError(f"{exc.__class__.__name__}: {exc}", trace) from exc
@@ -181,7 +219,16 @@ class TuitionAgent:
 
         summary = PaymentSummary(student_no=tuition["studentNo"], term=term, amount=amount.quantize(Decimal("0.01")),
                                  current_balance=balance, currency=tuition.get("currency", "USD"))
-        if not self.confirm_payment(summary):
+        decision = self.confirm_payment(summary)
+        if decision is None:
+            self.pending_payment = summary
+            return {"status": "CONFIRMATION_REQUIRED",
+                    "message": "Nothing has been paid yet. The user must press Confirm or Cancel in the interface. "
+                               "Briefly summarize the payment and ask the user to confirm it.",
+                    "summary": {"term": term, "amount": float(summary.amount),
+                                "currentBalance": float(balance), "currency": summary.currency}}, "pending"
+        self.pending_payment = None
+        if not decision:
             return {"status": "CANCELLED", "message": "The user did not confirm the payment. Nothing was paid."}, "no"
 
         try:

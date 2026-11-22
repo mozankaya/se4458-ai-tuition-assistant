@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Tuition Assistant</title>
+<style>
+  :root {
+    --bg: #f4f6fa; --panel: #ffffff; --text: #1f2933; --muted: #6b7785; --border: #dde3ea;
+    --primary: #2457c5; --primary-dark: #1b438f; --user: #2457c5; --assistant: #ffffff;
+    --mcp: #7a3fc2; --rest: #0f7b6c; --danger: #c23b3b; --warn-bg: #fff7e0; --warn-border: #f0c44c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--primary); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 19px; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: .85; }
+  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); }
+  main { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
+  .hidden { display: none !important; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], input[type=password] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; }
+  button { padding: 9px 16px; border-radius: 6px; border: 1px solid var(--primary); background: var(--primary); color: #fff; font-size: 14px; cursor: pointer; }
+  button:hover { background: var(--primary-dark); }
+  button.secondary { background: #fff; color: var(--primary); }
+  button.danger { background: #fff; color: var(--danger); border-color: var(--danger); }
+  button:disabled { opacity: .5; cursor: default; }
+  .error { color: var(--danger); font-size: 14px; margin-top: 10px; }
+  #login { max-width: 380px; margin: 60px auto; }
+  #login h2 { margin-top: 0; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 14px; }
+  #messages { display: flex; flex-direction: column; gap: 14px; min-height: 340px; max-height: calc(100vh - 290px); overflow-y: auto; padding: 4px; }
+  .msg { max-width: 82%; padding: 11px 14px; border-radius: 10px; line-height: 1.5; font-size: 15px; }
+  .msg.user { align-self: flex-end; background: var(--user); color: #fff; }
+  .msg.assistant { align-self: flex-start; background: var(--assistant); border: 1px solid var(--border); }
+  .msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 13px; }
+  .msg.error-msg { align-self: flex-start; background: #fdecec; border: 1px solid var(--danger); color: var(--danger); }
+  .msg ul { margin: 6px 0; padding-left: 20px; }
+  .msg code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  details.trace { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; font-size: 13px; }
+  details.trace summary { cursor: pointer; color: var(--muted); }
+  .tool { margin-top: 8px; padding: 8px; background: #f7f9fc; border-radius: 6px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; color: #fff; padding: 2px 7px; border-radius: 10px; margin-right: 6px; }
+  .badge.mcp { background: var(--mcp); } .badge.rest { background: var(--rest); }
+  .tool pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; font-size: 12px; }
+  .confirm { align-self: stretch; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 14px 18px; }
+  .confirm h3 { margin: 0 0 8px; font-size: 16px; }
+  .confirm table { border-collapse: collapse; margin-bottom: 12px; }
+  .confirm td { padding: 3px 18px 3px 0; font-size: 14px; }
+  .confirm td:first-child { color: var(--muted); }
+  .confirm .buttons { display: flex; gap: 10px; }
+  #composer { display: flex; gap: 10px; margin-top: 14px; }
+  #composer input { flex: 1; }
+  #samples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #samples button { font-size: 12px; padding: 6px 10px; }
+  .thinking { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>AI Tuition Assistant</h1>
+    <div class="sub">Policies via MCP · live tuition data via the API Gateway</div>
+  </div>
+  <div id="userbox" class="hidden">
+    <span id="userlabel"></span>
+    <button id="logout" style="margin-left:12px">Log out</button>
+  </div>
+</header>
+
+<main>
+  <section id="login" class="card">
+    <h2>Student login</h2>
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input type="text" id="username" autocomplete="username" value="student1" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+      <div style="margin-top:18px"><button type="submit" id="loginButton">Log in</button></div>
+      <div id="loginError" class="error"></div>
+    </form>
+    <div class="hint">Demo users: student1 … student4 (password: SEED_DEMO_PASSWORD from .env).</div>
+  </section>
+
+  <section id="chat" class="card hidden">
+    <div id="messages"></div>
+    <form id="composer">
+      <input type="text" id="message" placeholder="Ask about deadlines, installments, your balance or a payment…" autocomplete="off">
+      <button type="submit" id="send">Send</button>
+    </form>
+    <div id="samples">
+      <button class="secondary" type="button">When is the payment deadline?</button>
+      <button class="secondary" type="button">What is my balance?</button>
+      <button class="secondary" type="button">Can I pay my outstanding balance in installments?</button>
+      <button class="secondary" type="button">Pay part of my balance</button>
+      <button class="secondary" type="button">Show me the balance of student 20230002</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TOOL_KIND = {
+  search_tuition_policies: ["mcp", "MCP"],
+  get_my_tuition: ["rest", "REST · Gateway"],
+  pay_tuition: ["rest", "REST · Gateway"],
+};
+let busy = false;
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Minimal Markdown: **bold**, `code`, "- " bullet lists, line breaks.
+function renderMarkdown(text) {
+  const lines = escapeHtml(text || "").split("\n");
+  let html = "", inList = false;
+  for (const raw of lines) {
+    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+    if (bullet) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${bullet[1]}</li>`;
+    } else {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += line.trim() ? `${line}<br>` : "<br>";
+    }
+  }
+  if (inList) html += "</ul>";
+  return html.replace(/(<br>)+$/, "");
+}
+
+function addMessage(kind, html) {
+  const div = document.createElement("div");
+  div.className = `msg ${kind}`;
+  div.innerHTML = html;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+  return div;
+}
+
+function traceHtml(data) {
+  const calls = data.trace || [];
+  let html = `<details class="trace"><summary>Tool trace: ${calls.length} tool call(s), ${data.llmCalls} LLM call(s)`;
+  html += data.traceFile ? ` · saved as ${escapeHtml(data.traceFile)}` : "";
+  html += "</summary>";
+  if (calls.length === 0) html += `<div class="tool">No tools were needed.</div>`;
+  for (const call of calls) {
+    const [cls, label] = TOOL_KIND[call.tool] || ["rest", "tool"];
+    const confirmation = call.confirmation ? ` · confirmation: <strong>${escapeHtml(call.confirmation)}</strong>` : "";
+    html += `<div class="tool"><span class="badge ${cls}">${label}</span><strong>${escapeHtml(call.tool)}</strong>${confirmation}`;
+    html += `<pre>input: ${escapeHtml(JSON.stringify(call.input))}</pre>`;
+    html += `<pre>result: ${escapeHtml(JSON.stringify(call.result, null, 2))}</pre></div>`;
+  }
+  return html + "</details>";
+}
+
+function money(value, currency) {
+  return `${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function showConfirmation(p) {
+  document.querySelectorAll(".confirm").forEach((el) => el.remove());
+  if (!p) return;
+  const div = addMessage("confirm", `
+    <h3>Payment confirmation required</h3>
+    <table>
+      <tr><td>Student</td><td>${escapeHtml(p.studentNo)}</td></tr>
+      <tr><td>Term</td><td>${escapeHtml(p.term)}</td></tr>
+      <tr><td>Amount</td><td><strong>${money(p.amount, p.currency)}</strong></td></tr>
+      <tr><td>Current balance</td><td>${money(p.currentBalance, p.currency)}</td></tr>
+      <tr><td>Balance after</td><td>${money(p.balanceAfter, p.currency)}</td></tr>
+    </table>
+    <div class="buttons">
+      <button type="button" data-approve="true">Confirm payment</button>
+      <button type="button" class="danger" data-approve="false">Cancel</button>
+    </div>`);
+  div.className = "confirm";
+  div.querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => send("/api/confirm", { approved: b.dataset.approve === "true" },
+      b.dataset.approve === "true" ? "✔ Confirm payment" : "✖ Cancel payment")));
+}
+
+function handleReply(data) {
+  if (data.error) addMessage("error-msg", escapeHtml(data.error) + traceHtml(data));
+  else addMessage("assistant", renderMarkdown(data.answer) + traceHtml(data));
+  showConfirmation(data.pendingPayment);
+}
+
+async function post(url, body) {
+  const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(data.detail || `Request failed (${response.status})`), { status: response.status });
+  return data;
+}
+
+function setBusy(value) {
+  busy = value;
+  for (const el of document.querySelectorAll("#composer button, #composer input, #samples button, .confirm button")) el.disabled = value;
+}
+
+async function send(url, body, userText) {
+  if (busy) return;
+  addMessage("user", escapeHtml(userText));
+  if (url === "/api/confirm") document.querySelectorAll(".confirm").forEach((el) => el.remove());
+  setBusy(true);
+  const thinking = addMessage("assistant thinking", "Thinking…");
+  try {
+    handleReply(await post(url, body));
+  } catch (err) {
+    if (err.status === 401) return showLogin("Your session has ended. Please log in again.");
+    addMessage("error-msg", escapeHtml(err.message));
+  } finally {
+    thinking.remove();
+    setBusy(false);
+    $("message").focus();
+  }
+}
+
+function showChat(user) {
+  $("login").classList.add("hidden");
+  $("chat").classList.remove("hidden");
+  $("userbox").classList.remove("hidden");
+  $("userlabel").textContent = `${user.username} · student ${user.studentNo}`;
+  if (!$("messages").children.length) {
+    addMessage("system", "Logged in. Ask a question or pick an example below.");
+  }
+  showConfirmation(user.pendingPayment);
+  $("message").focus();
+}
+
+function showLogin(error) {
+  $("chat").classList.add("hidden");
+  $("userbox").classList.add("hidden");
+  $("login").classList.remove("hidden");
+  $("messages").innerHTML = "";
+  $("loginError").textContent = error || "";
+}
+
+$("loginForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("loginError").textContent = "";
+  $("loginButton").disabled = true;
+  try {
+    showChat(await post("/api/login", { username: $("username").value.trim(), password: $("password").value }));
+    $("password").value = "";
+  } catch (err) {
+    $("loginError").textContent = err.message;
+  } finally {
+    $("loginButton").disabled = false;
+  }
+});
+
+$("composer").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = $("message").value.trim();
+  if (!text) return;
+  $("message").value = "";
+  send("/api/chat", { message: text }, text);
+});
+
+document.querySelectorAll("#samples button").forEach((b) =>
+  b.addEventListener("click", () => send("/api/chat", { message: b.textContent }, b.textContent)));
+
+$("logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  showLogin();
+});
+
+fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((user) => (user ? showChat(user) : showLogin()));
+</script>
+</body>
+</html>
