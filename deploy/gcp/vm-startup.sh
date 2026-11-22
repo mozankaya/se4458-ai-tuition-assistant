@@ -1,7 +1,9 @@
 #!/bin/bash
-# Startup script for the Google Cloud VM (runs as root on every boot).
-# Installs Docker, fetches the repository, creates /opt/tuition/.env with random secrets
-# (only on the first boot) and starts PostgreSQL, Tuition API, MCP server and Kong with docker compose.
+# VM startup script, used by deploy/gcp/deploy.sh (Google Cloud) and deploy/aws/deploy.sh (AWS EC2).
+# Runs as root on a Debian/Ubuntu VM. Installs Docker, fetches the repository, creates
+# /opt/tuition/.env with random secrets (only on the first boot) and starts PostgreSQL, Tuition API,
+# MCP server and Kong with docker compose.
+# Optional: SEED_DEMO_PASSWORD set in the environment is used as the demo users' password.
 set -euo pipefail
 
 REPO_URL="https://github.com/mozankaya/se4458-ai-tuition-assistant.git"
@@ -9,6 +11,12 @@ APP_DIR=/opt/tuition
 LOG=/var/log/tuition-startup.log
 exec >>"$LOG" 2>&1
 echo "=== startup $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+
+# Small VMs (2 GB RAM) need swap for the image builds.
+if [ ! -f /swapfile ]; then
+    fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+    echo "/swapfile none swap sw 0 0" >> /etc/fstab
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
     apt-get update -y
@@ -30,7 +38,7 @@ if [ ! -f .env ]; then
     sed -i \
         -e "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" \
         -e "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" \
-        -e "s/^SEED_DEMO_PASSWORD=.*/SEED_DEMO_PASSWORD=demo-$(openssl rand -hex 4)/" \
+        -e "s/^SEED_DEMO_PASSWORD=.*/SEED_DEMO_PASSWORD=${SEED_DEMO_PASSWORD:-demo-$(openssl rand -hex 4)}/" \
         .env
     # Keep DATABASE_URL consistent with the generated password (used only by host-side tools).
     PG_PASSWORD=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2)
