@@ -32,7 +32,9 @@ cd agent && ../.venv/Scripts/python -m pytest -q && cd ..
 .venv/Scripts/python gateway/smoke_test.py
 cd mcp_server && ../.venv/Scripts/python retrieval_demo.py && cd ..
 
-# 6. Chat with the assistant (log in as student1 with SEED_DEMO_PASSWORD)
+# 6. Chat with the assistant in the browser: http://localhost:8090 (student1 / SEED_DEMO_PASSWORD)
+cd agent && ../.venv/Scripts/python -m tuition_agent.web
+#    or in the terminal:
 cd agent && ../.venv/Scripts/python -m tuition_agent -u student1
 ```
 
@@ -220,11 +222,20 @@ agent executes them (MCP for policy, REST via the gateway for live data) → res
 | `get_my_tuition()` | `GET /api/v1/banking/tuition/{studentNo}` via gateway | Student number comes from the JWT |
 | `pay_tuition(term, amount)` | `POST /api/v1/banking/payments` via gateway | Requires typing `yes`; agent generates the `transactionId` |
 
-- **Login:** the CLI logs in as a student at start-up; non-student accounts are rejected.
+Two interfaces run the same agent:
+
+- **Web chat** (`python -m tuition_agent.web` → http://localhost:8090): student login, chat with
+  example questions, an expandable tool trace under every answer (MCP vs REST badges), and a payment
+  confirmation card with **Confirm payment** / **Cancel** buttons. The page talks only to this local
+  server (bound to `127.0.0.1`), which runs the agent.
+- **CLI** (`python -m tuition_agent`): the same flow in the terminal; payments are confirmed by
+  typing `yes`.
+
+- **Login:** the user logs in as a student at start-up; non-student accounts are rejected.
 - **Payment confirmation (enforced in code):** before calling the payment API the agent fetches the
-  live balance and shows student, term, amount, current balance and balance after. Only the exact
-  answer `yes` submits the payment. Invalid amounts or amounts above the term balance are rejected
-  before the user is asked.
+  live balance and shows student, term, amount, current balance and balance after. The payment API is
+  called only after the user clicks **Confirm payment** (web) or types exactly `yes` (CLI). Invalid
+  amounts or amounts above the term balance are rejected before the user is asked.
 - **Tool trace:** every question prints the tool names, inputs and results, and saves a JSON file
   (`docs/traces/agent_<timestamp>_<question>.json`) with the final answer and LLM token usage.
 
@@ -311,9 +322,9 @@ runs in a transaction that is rolled back.
 |---|---|---|---|
 | Tuition API | `cd api && ../.venv/Scripts/python -m pytest -q` | 121 | Every operation with success and error/edge cases: login and JWT validation, role and ownership checks, mobile query + daily limit (incl. day change in Istanbul time), banking query, payments (partial/full, duplicate transaction ID, amount above balance, invalid amounts, concurrent payments), admin add/update, CSV batch (row errors, BOM, invalid files), unpaid paging, error format, OpenAPI file up to date |
 | MCP server | `cd mcp_server && ../.venv/Scripts/python -m pytest -q` | 29 | Chunker, BM25 ranking for the demo queries, top-k and empty-query validation, index built once, MCP protocol tests with a real client session |
-| AI agent | `cd agent && ../.venv/Scripts/python -m pytest -q` | 55 | Mock LLM: tool dispatch for the 4 demo scenarios, payment only after `yes`, isolation from other students, REST/MCP client error handling, trace content, Gemini thought-signature round trip |
+| AI agent | `cd agent && ../.venv/Scripts/python -m pytest -q` | 68 | Mock LLM: tool dispatch for the 4 demo scenarios, payment only after `yes` or the Confirm button, web chat API, isolation from other students, REST/MCP client error handling, trace content, Gemini thought-signature round trip |
 
-Latest run: **205 tests passed** — full log in [docs/test-results.txt](docs/test-results.txt).
+Latest run: **218 tests passed** — full log in [docs/test-results.txt](docs/test-results.txt).
 The API suite takes about 2 minutes because every login runs the real password hash (PBKDF2).
 
 Additional checks against the running stack: `gateway/smoke_test.py` (12 gateway checks) and
