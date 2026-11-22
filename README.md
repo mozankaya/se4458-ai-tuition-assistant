@@ -12,9 +12,15 @@ deadlines, installments, payment rules, balances and payments. It combines:
 
 Prerequisites: Docker Desktop, Python 3.12, a free Gemini API key (https://aistudio.google.com/apikey).
 
+The commands below are for **bash** (Git Bash on Windows). On macOS/Linux use `python3.12 -m venv .venv`
+and `.venv/bin/python` instead of `py -3.12 -m venv .venv` and `.venv/Scripts/python`.
+The values in `.env.example` work as they are for a local run; only `GEMINI_API_KEY` must be added
+for the chat (tests, smoke test and MCP demo do not need it). These steps were verified on a fresh
+clone of this repository.
+
 ```bash
 # 1. Configuration
-cp .env.example .env        # set POSTGRES_PASSWORD, JWT_SECRET, SEED_DEMO_PASSWORD, GEMINI_API_KEY
+cp .env.example .env        # then add GEMINI_API_KEY (change the passwords for anything non-local)
 
 # 2. Start PostgreSQL, Tuition API, MCP server and Kong gateway (demo data is seeded automatically)
 docker compose up -d --build
