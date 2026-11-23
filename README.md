@@ -490,4 +490,4 @@ to the traces `docs/traces/agent_20261122-1847*` … `-185043*`.
 
 ### Video
 
-_TBD_ — link to the demonstration video.
+Demo video (about 5 minutes, Turkish narration): [Google Drive – SE 4458 Midterm 1 demo](https://drive.google.com/file/d/1bE7X2sjuSCphRv3zTAYNrAX4laLIRdst/view?usp=sharing)
