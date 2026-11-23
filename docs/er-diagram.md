@@ -46,7 +46,7 @@ erDiagram
         int user_id FK "nullable, who submitted"
         numeric amount "NUMERIC(12,2), > 0"
         varchar status "SUCCESS"
-        varchar channel "banking | agent"
+        varchar channel "always banking (agent payments use the banking API)"
         timestamptz created_at
     }
 
