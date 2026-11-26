@@ -102,7 +102,7 @@ Non-student users: `bank1` (role `bank`), `admin1` (role `admin`).
 
 ## REST API
 
-- Swagger UI: `http://localhost:8000/docs` (local gateway) · cloud: http://13.48.42.90:8000/docs
+- Swagger UI: `http://localhost:8000/docs` (local gateway) · cloud (removed after grading): http://13.48.42.90:8000/docs
 - OpenAPI specification: [docs/openapi.json](docs/openapi.json) (regenerate with
   `cd api && ../.venv/Scripts/python -m app.export_openapi`; a test fails if it is out of date)
 
@@ -127,7 +127,7 @@ All REST traffic goes through it, including the AI agent (`GATEWAY_BASE_URL`). T
 separate path and does not go through the gateway, as the assignment's architecture requires.
 
 - Local gateway URL: `http://localhost:8000` → upstream Tuition API on port `8080`
-- Cloud gateway URL (AWS): `http://13.48.42.90:8000` → see [Cloud deployment](#cloud-deployment)
+- Cloud gateway URL (AWS, removed after grading): `http://13.48.42.90:8000` → see [Cloud deployment](#cloud-deployment)
 
 | Public route (gateway) | Methods | Upstream | Gateway policy |
 |---|---|---|---|
@@ -342,6 +342,12 @@ The system is deployed on **Amazon Web Services (AWS)**: one EC2 instance in `eu
 (Stockholm) runs the same docker compose stack as the local setup (PostgreSQL, Tuition API, MCP
 server, Kong gateway). It was created with one script, [deploy/aws/deploy.sh](deploy/aws/deploy.sh),
 run in AWS CloudShell.
+
+> **Note:** After the midterm was graded (November 2026) the AWS instance was removed to stop cloud
+> costs, so the URLs below no longer respond. The cloud run is documented by the saved results in
+> [docs/traces/cloud](docs/traces/cloud) and the AWS screenshots below. The same deployment can be
+> recreated with [deploy/aws/deploy.sh](deploy/aws/deploy.sh) (see
+> [Deploy it yourself](#deploy-it-yourself-aws)); it gets a new public IP.
 
 | Endpoint | URL |
 |---|---|
