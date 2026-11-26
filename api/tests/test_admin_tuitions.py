@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Student, Tuition
@@ -180,3 +180,93 @@ def test_batch_requires_admin(client: TestClient, seeded: Session, login: Callab
     response = _upload(client, login("bank1"), "studentNo,term,amount,currency\n")
 
     assert response.status_code == 403
+
+
+# --- Batch edge cases ----------------------------------------------------------------------------
+
+def test_batch_accepts_crlf_quotes_and_trailing_commas(client: TestClient, seeded: Session, login: Callable):
+    # Spreadsheet exports: Windows line endings, quoted cells, an empty trailing column.
+    content = 'studentNo,term,amount,currency,\r\n"20230010","2026-FALL"," 100.50 ",USD,\r\n'
+
+    body = _upload(client, login("admin1"), content).json()
+
+    assert body["status"] == "COMPLETED", body
+    assert _tuition(seeded, "20230010", "2026-FALL").amount == Decimal("100.50")
+
+
+def test_batch_row_with_extra_column_is_reported(client: TestClient, seeded: Session, login: Callable):
+    content = "studentNo,term,amount,currency\n20230010,2026-FALL,100,USD,extra\n20230011,2026-FALL,100,USD\n"
+
+    body = _upload(client, login("admin1"), content).json()
+
+    assert body["status"] == "PARTIAL"
+    assert [(e["line"], e["code"]) for e in body["errors"]] == [(2, "INVALID_ROW")]
+
+
+def test_batch_line_numbers_count_blank_lines_and_multiline_cells(
+    client: TestClient, seeded: Session, login: Callable
+):
+    content = 'studentNo,term,amount,currency\n\n"20230010\nx",2026-FALL,100,USD\n20230011,2026-FALL,-5,USD\n'
+
+    body = _upload(client, login("admin1"), content).json()
+
+    # The quoted cell spans lines 3-4, so the next row is line 5.
+    assert [(e["line"], e["code"]) for e in body["errors"]] == [(4, "VALIDATION_ERROR"), (5, "VALIDATION_ERROR")]
+
+
+def test_batch_rows_conflicting_inside_one_file(client: TestClient, seeded: Session, login: Callable):
+    content = "studentNo,term,amount,currency\n20230010,2026-FALL,100,USD\n20230010,2027-SPRING,100,EUR\n"
+
+    body = _upload(client, login("admin1"), content).json()
+
+    assert body["status"] == "PARTIAL"
+    assert [(e["line"], e["code"]) for e in body["errors"]] == [(3, "CURRENCY_MISMATCH")]
+    assert _tuition(seeded, "20230010", "2026-FALL") is not None
+    assert _tuition(seeded, "20230010", "2027-SPRING") is None
+
+
+def test_batch_semicolon_file_explains_expected_header(client: TestClient, seeded: Session, login: Callable):
+    response = _upload(client, login("admin1"), "studentNo;term;amount;currency\n20230010;2026-FALL;100;USD\n")
+
+    assert response.status_code == 422
+    assert "comma-separated" in response.json()["error"]["message"]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [b"studentNo,term,amount,currency\n20230010,2026-FALL,1\x0000,USD\n",
+     ("studentNo,term,amount,currency\n" + '"' + "x" * 200_000 + '",2026-FALL,1,USD\n').encode()],
+    ids=["nul-byte", "huge-cell"],
+)
+def test_batch_malformed_file_is_rejected_without_changes(
+    client: TestClient, seeded: Session, login: Callable, content
+):
+    before = seeded.scalar(select(func.count()).select_from(Tuition))
+
+    response = _upload(client, login("admin1"), content)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_CSV"
+    assert seeded.scalar(select(func.count()).select_from(Tuition)) == before
+
+
+def test_batch_too_many_rows_is_rejected_before_any_write(
+    client: TestClient, seeded: Session, login: Callable, monkeypatch
+):
+    monkeypatch.setattr("app.services.admin.MAX_BATCH_ROWS", 2)
+    content = "studentNo,term,amount,currency\n" + "".join(f"2023002{i},2026-FALL,100,USD\n" for i in range(3))
+
+    response = _upload(client, login("admin1"), content)
+
+    assert response.status_code == 422
+    assert _tuition(seeded, "20230020", "2026-FALL") is None
+
+
+def test_batch_file_too_large_returns_413(client: TestClient, seeded: Session, login: Callable, monkeypatch):
+    monkeypatch.setattr("app.services.admin.MAX_BATCH_BYTES", 50)
+    content = "studentNo,term,amount,currency\n20230010,2026-FALL,100,USD\n"
+
+    response = _upload(client, login("admin1"), content)
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "FILE_TOO_LARGE"
