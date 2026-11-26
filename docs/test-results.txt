@@ -1,8 +1,11 @@
-Test run: 2026-11-22T13:37:29Z (Python 3.12.10, PostgreSQL test database: docker compose service db-test)
+Test run: 2026-11-26T17:50:09Z (Python 3.12.10, PostgreSQL test database: docker compose service db-test)
 
 ===== api: python -m pytest -v =====
 ============================= test session starts =============================
 
+tests/test_admin_concurrency.py::test_concurrent_creates_of_same_new_student_and_term PASSED
+tests/test_admin_concurrency.py::test_concurrent_creates_with_different_currencies_keep_one_currency PASSED
+tests/test_admin_concurrency.py::test_concurrent_batches_on_same_students_do_not_deadlock PASSED
 tests/test_admin_tuitions.py::test_add_tuition_creates_record_and_student PASSED
 tests/test_admin_tuitions.py::test_add_tuition_updates_existing_record PASSED
 tests/test_admin_tuitions.py::test_currency_defaults_to_usd PASSED
@@ -26,6 +29,15 @@ tests/test_admin_tuitions.py::test_batch_invalid_file_returns_422[empty] PASSED
 tests/test_admin_tuitions.py::test_batch_invalid_file_returns_422[header-only] PASSED
 tests/test_admin_tuitions.py::test_batch_invalid_file_returns_422[not-utf8] PASSED
 tests/test_admin_tuitions.py::test_batch_requires_admin PASSED
+tests/test_admin_tuitions.py::test_batch_accepts_crlf_quotes_and_trailing_commas PASSED
+tests/test_admin_tuitions.py::test_batch_row_with_extra_column_is_reported PASSED
+tests/test_admin_tuitions.py::test_batch_line_numbers_count_blank_lines_and_multiline_cells PASSED
+tests/test_admin_tuitions.py::test_batch_rows_conflicting_inside_one_file PASSED
+tests/test_admin_tuitions.py::test_batch_semicolon_file_explains_expected_header PASSED
+tests/test_admin_tuitions.py::test_batch_malformed_file_is_rejected_without_changes[nul-byte] PASSED
+tests/test_admin_tuitions.py::test_batch_malformed_file_is_rejected_without_changes[huge-cell] PASSED
+tests/test_admin_tuitions.py::test_batch_too_many_rows_is_rejected_before_any_write PASSED
+tests/test_admin_tuitions.py::test_batch_file_too_large_returns_413 PASSED
 tests/test_admin_unpaid.py::test_unpaid_for_term_lists_only_outstanding_records PASSED
 tests/test_admin_unpaid.py::test_unpaid_without_term_covers_all_terms PASSED
 tests/test_admin_unpaid.py::test_paging_splits_results_in_stable_order PASSED
@@ -125,7 +137,7 @@ tests/test_payments.py::test_admin_cannot_pay PASSED
 tests/test_payments.py::test_payment_requires_token PASSED
 tests/test_payments.py::test_concurrent_payments_cannot_exceed_balance PASSED
 
-======================= 121 passed in 107.65s (0:01:47) =======================
+======================= 133 passed in 107.09s (0:01:47) =======================
 
 ===== mcp_server: python -m pytest -v =====
 ============================= test session starts =============================
@@ -144,7 +156,7 @@ tests/test_index.py::test_response_matches_policy_section_9_format PASSED
 tests/test_index.py::test_results_are_sorted_by_score PASSED
 tests/test_index.py::test_unrelated_query_returns_no_matches PASSED
 tests/test_index.py::test_empty_query_is_rejected[] PASSED
-tests/test_index.py::test_empty_query_is_rejected[ PASSED
+tests/test_index.py::test_empty_query_is_rejected[   ] PASSED
 tests/test_index.py::test_top_k_out_of_range_is_rejected[0] PASSED
 tests/test_index.py::test_top_k_out_of_range_is_rejected[11] PASSED
 tests/test_index.py::test_index_is_built_once_and_does_not_reread_the_file PASSED
@@ -153,14 +165,14 @@ tests/test_index.py::test_small_index_ranks_relevant_chunk_first PASSED
 tests/test_index.py::test_tokenize_lowercases_drops_stopwords_and_plural_s PASSED
 tests/test_index.py::test_tokenize_keeps_numbers_and_short_words PASSED
 tests/test_server.py::test_server_lists_search_tool_with_schema PASSED
-tests/test_server.py::test_search_tool_returns_relevant_sections_first[When PASSED
-tests/test_server.py::test_search_tool_returns_relevant_sections_first[Can PASSED
-tests/test_server.py::test_search_tool_returns_relevant_sections_first[What PASSED
+tests/test_server.py::test_search_tool_returns_relevant_sections_first[When is the payment deadline?-relevant_sections0] PASSED
+tests/test_server.py::test_search_tool_returns_relevant_sections_first[Can I pay my balance in installments?-relevant_sections1] PASSED
+tests/test_server.py::test_search_tool_returns_relevant_sections_first[What happens if I pay late? Is there a late fee?-relevant_sections2] PASSED
 tests/test_server.py::test_search_tool_rejects_invalid_arguments[arguments0] PASSED
 tests/test_server.py::test_search_tool_rejects_invalid_arguments[arguments1] PASSED
 tests/test_server.py::test_search_tool_rejects_invalid_arguments[arguments2] PASSED
 
-============================= 29 passed in 2.94s ==============================
+============================= 29 passed in 3.17s ==============================
 
 ===== agent: python -m pytest -v =====
 ============================= test session starts =============================
@@ -192,8 +204,8 @@ tests/test_api_client.py::test_non_student_accounts_are_rejected[bank-None] PASS
 tests/test_api_client.py::test_non_student_accounts_are_rejected[admin-None] PASSED
 tests/test_api_client.py::test_calls_before_login_are_rejected_without_network PASSED
 tests/test_api_client.py::test_api_error_keeps_code_and_details_for_the_llm PASSED
-tests/test_api_client.py::test_non_api_error_bodies_are_handled[/gateway-error-502-<html>Bad PASSED
-tests/test_api_client.py::test_non_api_error_bodies_are_handled[/unknown-404-no PASSED
+tests/test_api_client.py::test_non_api_error_bodies_are_handled[/gateway-error-502-<html>Bad Gateway</html>] PASSED
+tests/test_api_client.py::test_non_api_error_bodies_are_handled[/unknown-404-no Route matched with those values] PASSED
 tests/test_api_client.py::test_network_failure_becomes_api_error PASSED
 tests/test_api_client.py::test_logout_clears_identity PASSED
 tests/test_demo_scenarios.py::test_scenario_1_mcp_only_payment_deadline PASSED
@@ -204,8 +216,8 @@ tests/test_demo_scenarios.py::test_scenario_4_question_alone_is_not_authorizatio
 tests/test_demo_scenarios.py::test_other_student_number_in_prompt_cannot_reach_other_data PASSED
 tests/test_llm.py::test_request_sends_tools_with_auto_tool_choice PASSED
 tests/test_llm.py::test_tool_calls_are_parsed PASSED
-tests/test_llm.py::test_invalid_tool_arguments_are_flagged_not_raised[{"term": PASSED
-tests/test_llm.py::test_invalid_tool_arguments_are_flagged_not_raised[[1, PASSED
+tests/test_llm.py::test_invalid_tool_arguments_are_flagged_not_raised[{"term": ] PASSED
+tests/test_llm.py::test_invalid_tool_arguments_are_flagged_not_raised[[1, 2]] PASSED
 tests/test_llm.py::test_assistant_message_round_trips_tool_calls PASSED
 tests/test_llm.py::test_gemini_thought_signature_is_sent_back_unchanged PASSED
 tests/test_llm.py::test_gemini_uses_openai_compatible_endpoint_and_default_model PASSED
@@ -234,4 +246,4 @@ tests/test_web.py::test_empty_message_is_rejected PASSED
 tests/test_web.py::test_resolve_without_pending_payment_raises PASSED
 tests/test_web.py::test_cli_style_immediate_confirmation_still_works PASSED
 
-============================= 68 passed in 6.55s ==============================
+============================= 68 passed in 5.93s ==============================

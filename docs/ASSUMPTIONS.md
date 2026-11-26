@@ -37,12 +37,26 @@ project progresses and summarized in the README.
 - All tuition records of one student must use the same currency (`409 CURRENCY_MISMATCH`).
 - A zero amount is allowed (e.g. full scholarship); negative amounts are rejected.
 - The response is `201 CREATED` for a new record and `200 UPDATED` for an existing one.
+- Concurrency: the student row is created with `INSERT ... ON CONFLICT DO NOTHING` and then locked
+  (`SELECT ... FOR UPDATE`) until commit. Simultaneous Add Tuition calls for the same student are
+  therefore applied one after the other: two creates of the same new `(studentNo, term)` give one
+  `CREATED` and one `UPDATED` (never a unique-constraint `500`), and two creates in different currencies
+  give one success and one `409 CURRENCY_MISMATCH`.
 - In a batch CSV, each row is processed independently; duplicate `(studentNo, term)` rows in the same
   file are applied in order (last one wins) and each is reported.
 - Batch upload is `multipart/form-data` with a UTF-8 CSV file (BOM allowed, blank lines ignored, at most
-  10,000 rows). A wrong header, an empty file or a non-UTF-8 file rejects the whole upload
-  (`422 INVALID_CSV`). Otherwise the response is `200` with `status` `COMPLETED` (no errors), `PARTIAL`
-  or `FAILED` (no row succeeded), counts, and per-row errors with the CSV line number.
+  10,000 rows and 5 MB). Standard CSV quoting and CRLF line endings are accepted, cells are trimmed, and
+  empty trailing columns (trailing commas from spreadsheet exports) are ignored. The file is checked as a
+  whole first: a wrong header (the message says the file must be comma-separated), an empty file, a file
+  without data rows, a non-UTF-8 or NUL-containing file, a malformed CSV (e.g. a cell over the CSV
+  field limit) or more than 10,000 rows rejects the whole upload with `422 INVALID_CSV`, and a file over
+  5 MB with `413 FILE_TOO_LARGE`, before any row is saved. Otherwise the response is `200` with `status`
+  `COMPLETED` (no errors), `PARTIAL` or `FAILED` (no row succeeded), counts, and per-row errors with the
+  CSV line number (the physical line where the row starts, counting blank lines and quoted multi-line
+  cells). A row with a wrong number of columns is reported as `INVALID_ROW`.
+- Each batch row is committed separately. Rows reported as saved stay saved even if a later row fails,
+  and row locks are held only for one row, so concurrent batches touching the same students in
+  different orders cannot deadlock.
 - A sample file for the demo is in [samples/tuitions_batch_sample.csv](samples/tuitions_batch_sample.csv).
 
 ## Unpaid Tuition Status

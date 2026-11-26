@@ -326,11 +326,11 @@ runs in a transaction that is rolled back.
 
 | Suite | Command | Tests | What is covered |
 |---|---|---|---|
-| Tuition API | `cd api && ../.venv/Scripts/python -m pytest -q` | 121 | Every operation with success and error/edge cases: login and JWT validation, role and ownership checks, mobile query + daily limit (incl. day change in Istanbul time), banking query, payments (partial/full, duplicate transaction ID, amount above balance, invalid amounts, concurrent payments), admin add/update, CSV batch (row errors, BOM, invalid files), unpaid paging, error format, OpenAPI file up to date |
+| Tuition API | `cd api && ../.venv/Scripts/python -m pytest -q` | 133 | Every operation with success and error/edge cases: login and JWT validation, role and ownership checks, mobile query + daily limit (incl. day change in Istanbul time), banking query, payments (partial/full, duplicate transaction ID, amount above balance, invalid amounts, concurrent payments), admin add/update, concurrent creates of the same student (real parallel transactions), CSV batch (row errors, BOM, CRLF/quoted cells, trailing commas, malformed/NUL/oversized files rejected before any write, row and size limits, concurrent batches without deadlock), unpaid paging, error format, OpenAPI file up to date |
 | MCP server | `cd mcp_server && ../.venv/Scripts/python -m pytest -q` | 29 | Chunker, BM25 ranking for the demo queries, top-k and empty-query validation, index built once, MCP protocol tests with a real client session |
 | AI agent | `cd agent && ../.venv/Scripts/python -m pytest -q` | 68 | Mock LLM: tool dispatch for the 4 demo scenarios, payment only after `yes` or the Confirm button, web chat API, isolation from other students, REST/MCP client error handling, trace content, Gemini thought-signature round trip |
 
-Latest run: **218 tests passed** — full log in [docs/test-results.txt](docs/test-results.txt).
+Latest run: **230 tests passed** — full log in [docs/test-results.txt](docs/test-results.txt).
 The API suite takes about 2 minutes because every login runs the real password hash (PBKDF2).
 
 Additional checks against the running stack: `gateway/smoke_test.py` (12 gateway checks) and
@@ -427,7 +427,9 @@ Summary of the main decisions; the full list is in [docs/ASSUMPTIONS.md](docs/AS
   Pay Tuition is per term; the amount must be `> 0` and `≤` that term's balance (no overpayment).
 - **Duplicates:** a reused `transactionId` is rejected with `409`, even with an identical payload. Add
   Tuition is create-or-update by `(studentNo, term)`; the amount may not drop below the paid amount; a
-  batch CSV applies rows independently (last duplicate row wins) and reports per-row errors.
+  batch CSV applies rows independently (last duplicate row wins) and reports per-row errors. Concurrent
+  creates for the same student are serialized by a row lock (one `CREATED`, one `UPDATED`), and a
+  malformed CSV is rejected as a whole before any row is saved.
 - **Mobile limit:** 3 calls per student number per day (Istanbul calendar day in the API, UTC day in
   Kong; both apply). Calls for unknown student numbers count too.
 - **Identity:** JWT (HS256) for demo users with roles `student`, `bank`, `admin`. Students can only
@@ -463,7 +465,7 @@ to the traces `docs/traces/agent_20261122-1847*` … `-185043*`.
 | | |
 |---|---|
 | 1. `docker compose ps`: all services healthy<br>![docker compose ps](docs/screenshots/01-docker-compose-ps.png) | 2. Swagger UI through the gateway (locks = protected routes)<br>![Swagger UI](docs/screenshots/02-swagger-ui.png) |
-| 3a. Tuition API tests (121 passed)<br>![API tests](docs/screenshots/03a-api-tests.png) | 3b. MCP server tests (29 passed)<br>![MCP tests](docs/screenshots/03b-mcp-tests.png) |
+| 3a. Tuition API tests (screenshot of 22 Nov: 121 passed; 133 since the concurrency and CSV edge-case tests)<br>![API tests](docs/screenshots/03a-api-tests.png) | 3b. MCP server tests (29 passed)<br>![MCP tests](docs/screenshots/03b-mcp-tests.png) |
 | 3c. Agent tests (68 passed)<br>![Agent tests](docs/screenshots/03c-agent-tests.png) | 5. Three MCP retrieval queries over HTTP<br>![MCP retrieval](docs/screenshots/05-mcp-retrieval.png) |
 
 4. Gateway smoke test: protected route (401 without / with forged token), 403 for another student,
